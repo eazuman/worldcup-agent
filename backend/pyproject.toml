@@ -1,0 +1,31 @@
+[project]
+name = "goldengoal-backend"
+version = "0.1.0"
+description = "GoldenGoal World Cup 2026 RAG agent backend (FastAPI + LangChain + Chroma)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # API
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx",
+    "python-dotenv",
+    # RAG
+    "langchain",
+    "langchain-community",
+    "langchain-google-genai",
+    "langchain-huggingface",
+    "langchain-chroma",
+    "sentence-transformers",
+    "chromadb",
+    "wikipedia",
+    # MCP + agent
+    "mcp[cli]",
+    "langchain-mcp-adapters",
+    # Hardening
+    "slowapi",
+]
+
+[tool.uv]
+# Application project (not a distributable library) — do not try to build app/scripts.
+package = false

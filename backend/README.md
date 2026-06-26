@@ -24,24 +24,32 @@ backend/
       store.py         # Chroma persistent client (CorpusVectorStore)
       service.py       # RAGService — retrieve + grounded Gemini answer (LCEL chain)
       ingest.py        # chunk + (re)build the index from data/corpus
-  requirements.txt
+      sources.py       # pluggable corpus sources (Wikipedia now; S3/files later)
+  scripts/
+    build_corpus.py    # fetch curated Wikipedia pages -> data/corpus/*.txt
+  pyproject.toml       # project + dependencies (uv)
+  uv.lock              # pinned, reproducible lockfile (uv)
 ```
 
-> Still **planned** (later phases): `app/agent.py` (Phase 5 agent loop), `app/tools/` (Phase 4 MCP
-> client + football-data client), and `scripts/scrape_corpus.py` (Phase 3 corpus scraper).
+> Still **planned** (later phases): `app/agent.py` (Phase 5 agent loop) and `app/tools/` (Phase 4 MCP
+> client + football-data client).
 
 ## Run locally
 
+Dependencies are managed with [uv](https://docs.astral.sh/uv/) (`pyproject.toml` + `uv.lock`).
+
 ```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+uv sync                       # create .venv from the lockfile
+
+# (one-off) refresh the corpus from Wikipedia
+uv run python -m scripts.build_corpus
 
 # Build the index from the committed corpus (data/corpus/*.txt)
-python -m app.rag.ingest
+uv run python -m app.rag.ingest
 
 # Serve the API (needs GOOGLE_API_KEY in ../.env for /ask)
-uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8000
 ```
 
 Endpoints:
