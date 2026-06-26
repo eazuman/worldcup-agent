@@ -1,0 +1,1 @@
+"""GoldenGoal backend application package."""

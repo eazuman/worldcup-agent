@@ -1,0 +1,20 @@
+# Pinned in Phase 2+. Listed here for reference.
+fastapi
+uvicorn[standard]
+httpx
+python-dotenv
+
+# RAG (Phase 3)
+langchain
+langchain-google-genai
+langchain-huggingface
+langchain-chroma
+sentence-transformers
+chromadb
+
+# MCP + agent (Phases 4–5)
+mcp[cli]
+langchain-mcp-adapters
+
+# Hardening (Phase 7)
+slowapi
