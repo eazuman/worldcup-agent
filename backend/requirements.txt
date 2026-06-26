@@ -6,11 +6,13 @@ python-dotenv
 
 # RAG (Phase 3)
 langchain
+langchain-community
 langchain-google-genai
 langchain-huggingface
 langchain-chroma
 sentence-transformers
 chromadb
+wikipedia
 
 # MCP + agent (Phases 4–5)
 mcp[cli]
