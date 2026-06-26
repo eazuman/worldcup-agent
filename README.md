@@ -12,12 +12,15 @@ An agentic **RAG + MCP + Agent + Vue** demo built around the FIFA World Cup 2026
 > wired against a stable `AskResponse` contract so the mock can be swapped for the real agent
 > without UI changes. See the [Build phases](#build-phases) and [Target architecture](#target-architecture) below.
 
+- **Agent:** LangChain agent driven by Gemini tool-calling — routes each question to RAG and/or live tools
 - **LLM:** Google Gemini `gemini-2.5-flash` (free tier)
+- **Backend:** FastAPI (`/ask`, `/health`)
+- **MCP connector:** `langchain-mcp-adapters` — exposes the MCP tools to the LangChain agent as tools
+- **MCP server:** FastMCP football tools (separate process): `get_fixtures`, `get_standings`, `get_top_scorers`, `get_results_on_date`
 - **Live data:** football-data.org (primary), TheSportsDB + openfootball (fallbacks)
 - **Embeddings:** local `all-MiniLM-L6-v2` (no API cost)
 - **Vector store:** Chroma (local)
 - **Frontend:** Vue 3 + Vite
-- **MCP:** FastMCP football tools (separate process)
 
 
 ## Screenshots
@@ -63,9 +66,10 @@ Where this is heading once the backend, RAG, MCP, and agent layers land:
 ```mermaid
 flowchart LR
     UI["Vue 3 UI<br/>(this repo, built)"] -- "POST /ask" --> API["FastAPI backend"]
-    API --> AGENT["Agent layer<br/>Gemini 2.5 Flash"]
+    API --> AGENT["LangChain agent<br/>Gemini 2.5 Flash tool-calling"]
     AGENT -- "historical / rules" --> RAG["RAG tool<br/>Chroma + MiniLM"]
-    AGENT -- "live scores / fixtures" --> MCP["MCP server<br/>FastMCP football tools"]
+    AGENT -- "live scores / fixtures" --> ADAPTER["langchain-mcp-adapters<br/>(MCP connector)"]
+    ADAPTER --> MCP["FastMCP server<br/>get_fixtures · get_standings<br/>get_top_scorers · get_results_on_date"]
     RAG --> CORPUS["data/corpus"]
     MCP --> EXT["football-data.org<br/>TheSportsDB"]
     AGENT -- "AskResponse" --> UI
@@ -73,10 +77,11 @@ flowchart LR
 
 **How the swap works:** the UI depends only on the `AskResponse` type
 ([`frontend/src/api/types.ts`](frontend/src/api/types.ts)). Today `askMock()` returns that shape;
-in Phase 6 it becomes a real `fetch()` to the FastAPI `/ask` endpoint. The agent then routes each
-question to **RAG** (history, rules, formats), a **live MCP tool** (today's scores, standings,
-fixtures), or **both combined**, and the existing source badge (`RAG` / `LIVE` / `AGENT`) already
-reflects that routing.
+in Phase 6 it becomes a real `fetch()` to the FastAPI `/ask` endpoint. Behind `/ask`, a **LangChain
+agent** (Gemini tool-calling) routes each question to **RAG** (history, rules, formats), to a
+**live MCP tool** reached through the **`langchain-mcp-adapters` connector** into the **FastMCP**
+server (today's scores, standings, fixtures), or **both combined** — and the existing source badge
+(`RAG` / `LIVE` / `AGENT`) already reflects that routing.
 
 ## Run the frontend (Phase 1)
 
