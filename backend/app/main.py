@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.rag.embeddings import get_embeddings
@@ -26,27 +29,55 @@ CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 embeddings = get_embeddings()
 vector_store = CorpusVectorStore(path=str(CHROMA_DIR), embeddings=embeddings)
 _rag_service: RAGService | None = None
+_agent = None  # compiled LangGraph agent, built lazily (needs GOOGLE_API_KEY)
 
 app = FastAPI(title="GoldenGoal RAG API", version="0.1.0")
+
+# Allow the Vite dev server (frontend) to call this API from the browser.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def _build_llm():
+    try:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+    except ImportError as exc:  # pragma: no cover - dependency missing
+        raise HTTPException(
+            status_code=500,
+            detail="langchain-google-genai is not installed.",
+        ) from exc
+    return ChatGoogleGenerativeAI(model=LLM_MODEL, temperature=0)
 
 
 def get_rag_service() -> RAGService:
     global _rag_service
     if _rag_service is None:
-        try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-        except ImportError as exc:  # pragma: no cover - dependency missing
-            raise HTTPException(
-                status_code=500,
-                detail="langchain-google-genai is not installed.",
-            ) from exc
-        llm = ChatGoogleGenerativeAI(model=LLM_MODEL, temperature=0)
+        llm = _build_llm()
         _rag_service = RAGService(vector_store=vector_store, llm=llm)
     return _rag_service
 
 
+def get_agent():
+    """Lazily build the compiled coach agent (needs GOOGLE_API_KEY)."""
+    global _agent
+    if _agent is None:
+        from app.agent import build_agent
+
+        _agent = build_agent(vector_store=vector_store, llm=_build_llm())
+    return _agent
+
+
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=1)
+
+
+class AgentChatRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    thread_id: str = Field(default="default")
 
 
 @app.post("/ingest")
@@ -101,6 +132,57 @@ async def ask(payload: AskRequest) -> dict:
             status_code=502,
             detail=f"Failed to answer question via Gemini: {exc}",
         ) from exc
+
+
+def _sse(payload: dict) -> str:
+    """Format a Server-Sent Events data frame."""
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+def _chunk_text(chunk) -> str:
+    """Extract plain text from an AIMessageChunk (content may be str or parts)."""
+    content = getattr(chunk, "content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for part in content:
+            if isinstance(part, str):
+                parts.append(part)
+            elif isinstance(part, dict):
+                parts.append(part.get("text", "") or "")
+        return "".join(parts)
+    return ""
+
+
+@app.post("/agent/chat")
+async def agent_chat(payload: AgentChatRequest) -> StreamingResponse:
+    """Stream the coach agent's response token-by-token over Server-Sent Events.
+
+    Emits JSON frames: {type: "token", content}, {type: "tool_start"|"tool_end",
+    name}, {type: "done"}, or {type: "error", detail}.
+    """
+    agent = get_agent()
+    config = {"configurable": {"thread_id": payload.thread_id}}
+    inputs = {"messages": [{"role": "user", "content": payload.question}]}
+
+    async def event_stream():
+        try:
+            async for event in agent.astream_events(inputs, config=config, version="v2"):
+                kind = event["event"]
+                if kind == "on_chat_model_stream":
+                    text = _chunk_text(event["data"]["chunk"])
+                    if text:
+                        yield _sse({"type": "token", "content": text})
+                elif kind == "on_tool_start":
+                    yield _sse({"type": "tool_start", "name": event.get("name", "")})
+                elif kind == "on_tool_end":
+                    yield _sse({"type": "tool_end", "name": event.get("name", "")})
+            yield _sse({"type": "done"})
+        except Exception as exc:  # noqa: BLE001 - surface a clean error frame
+            yield _sse({"type": "error", "detail": str(exc)})
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @app.get("/health")

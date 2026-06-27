@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
 import MessageBubble from './MessageBubble.vue'
-import { askMock, SAMPLE_QUESTIONS } from '../api/mock'
+import { streamAgent } from '../api/agent'
+import { SAMPLE_QUESTIONS } from '../api/mock'
 import type { ChatMessage } from '../api/types'
 
 const messages = ref<ChatMessage[]>([
@@ -9,10 +10,10 @@ const messages = ref<ChatMessage[]>([
     id: 0,
     role: 'assistant',
     text:
-      "Hi! Ask me anything about the FIFA World Cup 2026 — fixtures, standings, " +
-      "team history, or live scores. (Phase 1: answers are mock data.)",
+      "Hey! I'm your World Cup soccer coach. Ask me about the 2026 tournament — " +
+      "format, hosts, stadiums, team history. I answer from my World Cup knowledge base.",
     source: 'agent',
-    tool: 'agent · RAG + live',
+    tool: 'agent · RAG',
   },
 ])
 const input = ref('')
@@ -34,20 +35,41 @@ async function send(text?: string) {
 
   messages.value.push({ id: nextId++, role: 'user', text: question })
   const pendingId = nextId++
-  messages.value.push({ id: pendingId, role: 'assistant', text: '', pending: true })
+  messages.value.push({
+    id: pendingId,
+    role: 'assistant',
+    text: '',
+    pending: true,
+    source: 'agent',
+    tool: 'agent · thinking…',
+  })
   await scrollToBottom()
 
-  const res = await askMock(question)
-  const idx = messages.value.findIndex((m) => m.id === pendingId)
-  if (idx !== -1) {
-    messages.value[idx] = {
-      id: pendingId,
-      role: 'assistant',
-      text: res.answer,
-      source: res.source,
-      tool: res.tool,
-    }
+  const indexOfPending = () => messages.value.findIndex((m) => m.id === pendingId)
+  const patch = (changes: Partial<ChatMessage>) => {
+    const i = indexOfPending()
+    if (i !== -1) messages.value[i] = { ...messages.value[i], ...changes }
   }
+
+  let answer = ''
+
+  await streamAgent(question, {
+    onToken: (chunk) => {
+      answer += chunk
+      patch({ text: answer, pending: false })
+      scrollToBottom()
+    },
+    onTool: (name, phase) => {
+      if (phase === 'start') patch({ tool: `${name} · RAG`, pending: true })
+    },
+    onError: (detail) => {
+      patch({ text: answer || `⚠️ ${detail}`, pending: false })
+    },
+    onDone: () => {
+      patch({ pending: false })
+    },
+  })
+
   busy.value = false
   await scrollToBottom()
 }
