@@ -26,6 +26,11 @@ COPY --chown=user . .
 # Pre-download the MiniLM embedding model so cold starts are fast.
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')"
 
+# Build the RAG index at image-build time so cold starts just LOAD it instead
+# of rebuilding ~1,565 chunks on every boot. The startup hook sees a non-empty
+# store and skips the rebuild, shaving several seconds off the first request.
+RUN cd backend && python -m rag.ingest
+
 EXPOSE 7860
 WORKDIR /home/user/app/backend
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]

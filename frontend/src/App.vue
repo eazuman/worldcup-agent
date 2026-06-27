@@ -27,6 +27,42 @@ onMounted(async () => {
     dataMode.value = 'sample'
   }
 })
+
+// Swipe left/right on the main content area to navigate between tabs.
+// We compare horizontal vs vertical movement to distinguish a tab-swipe from
+// a normal vertical scroll inside the content — only horizontal-dominant
+// gestures switch tabs, vertical-dominant ones pass through to the scroller.
+let touchStartX = 0
+let touchStartY = 0
+let swipeIntent = false  // true once we've decided the gesture is horizontal
+const SWIPE_THRESHOLD = 50 // px minimum horizontal travel to commit a tab switch
+
+function onTouchStart(e: TouchEvent) {
+  touchStartX = e.touches[0].clientX
+  touchStartY = e.touches[0].clientY
+  swipeIntent = false
+}
+
+function onTouchMove(e: TouchEvent) {
+  const dx = Math.abs(e.touches[0].clientX - touchStartX)
+  const dy = Math.abs(e.touches[0].clientY - touchStartY)
+  if (!swipeIntent && dx > dy && dx > 8) {
+    swipeIntent = true
+  }
+  // Block the page/inner-scroll from taking over while the user is swiping sideways.
+  if (swipeIntent) e.preventDefault()
+}
+
+function onTouchEnd(e: TouchEvent) {
+  if (!swipeIntent) return
+  const dx = e.changedTouches[0].clientX - touchStartX
+  if (Math.abs(dx) < SWIPE_THRESHOLD) { swipeIntent = false; return }
+  const ids = tabs.map((t) => t.id)
+  const idx = ids.indexOf(tab.value)
+  if (dx < 0 && idx < ids.length - 1) tab.value = ids[idx + 1] // swipe left → next
+  if (dx > 0 && idx > 0) tab.value = ids[idx - 1]              // swipe right → prev
+  swipeIntent = false
+}
 </script>
 
 <template>
@@ -130,7 +166,17 @@ onMounted(async () => {
       </button>
     </nav>
 
-    <main class="main">
+    <!-- Swipe dot indicators — visible on touch devices only -->
+    <div class="swipe-dots" aria-hidden="true">
+      <span
+        v-for="t in tabs"
+        :key="t.id"
+        class="swipe-dot"
+        :class="{ active: tab === t.id }"
+      />
+    </div>
+
+    <main class="main" @touchstart.passive="onTouchStart" @touchmove="onTouchMove" @touchend.passive="onTouchEnd">
       <KeepAlive>
         <ChatPanel v-if="tab === 'chat'" />
         <StandingsView v-else-if="tab === 'standings'" />
@@ -387,6 +433,26 @@ onMounted(async () => {
   background: radial-gradient(closest-side, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0));
   animation: ballShadow 1.8s ease-in-out infinite;
 }
+/* On narrow screens shrink the scene so it doesn't overlap the title text */
+@media (max-width: 480px) {
+  .hero-flags {
+    top: auto;
+    bottom: 0.5rem;
+    right: 0.7rem;
+    font-size: 0.9rem;
+  }
+  .hero-scene {
+    width: 4.8rem;
+    height: 3rem;
+    right: 0.5rem;
+    bottom: 1.9rem;
+  }
+  .hero-trophy { font-size: 1.4rem; }
+  .hero-ball   { font-size: 1.9rem; right: 0.1rem; }
+  .hero-ball-shadow { width: 1.5rem; right: 0.3rem; }
+  .hero-title  { max-width: calc(100% - 5.5rem); }
+  .hero-sub    { max-width: calc(100% - 5rem); }
+}
 @keyframes ballBounce {
   0%, 100% {
     transform: translateY(0) scale(1.04, 0.96); /* gentle squash on contact */
@@ -430,12 +496,38 @@ onMounted(async () => {
   display: flex;
   gap: 0.35rem;
   padding: 0.35rem;
-  margin: 0.4rem 1.2rem 0.6rem;
+  margin: 0.4rem 1.2rem 0.4rem;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(148, 163, 184, 0.12);
   border-radius: 16px;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  /* allow tabs to scroll horizontally on narrow screens */
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.swipe-dots {
+  display: none;
+  justify-content: center;
+  gap: 6px;
+  padding: 0.3rem 0 0.15rem;
+}
+.swipe-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(148, 163, 184, 0.35);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.swipe-dot.active {
+  background: #3b82f6;
+  transform: scale(1.35);
+}
+@media (pointer: coarse) {
+  .swipe-dots { display: flex; }
+  .tab { min-width: 7rem; flex-shrink: 0; }
 }
 .tab {
   flex: 1;
