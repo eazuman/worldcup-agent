@@ -46,7 +46,7 @@ ALLOWED_ORIGINS = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://.*\.(pages\.dev|vercel\.app|hf\.space)",
+    allow_origin_regex=r"https://.*\.(pages\.dev|workers\.dev|vercel\.app|hf\.space)",
     allow_methods=["*"],
     allow_headers=["*"],
 )
