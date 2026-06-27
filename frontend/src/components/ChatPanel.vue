@@ -91,7 +91,16 @@ async function send(text?: string) {
       patch({ text: answer || `⚠️ ${detail}`, pending: false })
     },
     onDone: () => {
-      patch({ pending: false })
+      // The coach caps answers around 150 words to keep token cost down. When an
+      // answer runs long, surface a small italic note so the cap is transparent.
+      const wordCount = answer.trim().split(/\s+/).filter(Boolean).length
+      patch({
+        pending: false,
+        footnote:
+          wordCount >= 140
+            ? 'Response kept brief (~150 words) for cost optimization.'
+            : undefined,
+      })
     },
   })
 
@@ -112,6 +121,7 @@ async function send(text?: string) {
         :tool="m.tool"
         :pending="m.pending"
         :note="m.note"
+        :footnote="m.footnote"
       />
     </div>
 

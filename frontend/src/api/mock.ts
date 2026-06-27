@@ -16,7 +16,7 @@ const RAG_WORDS = [
   'record', 'records', '1930', '2022', 'profile', 'host', 'hosts', 'explain',
 ]
 
-function classify(question: string): AnswerSource {
+export function classify(question: string): AnswerSource {
   const t = question.toLowerCase()
   const live = LIVE_WORDS.some((w) => t.includes(w))
   const rag = RAG_WORDS.some((w) => t.includes(w))
@@ -65,7 +65,7 @@ export const SAMPLE_QUESTIONS = [
   'Which country has won the most World Cups?',
   'How is the GoldenGoal agent set up — walk me through how it works?',
   'What World Cup matches are on the schedule today?',
-  'How are RAG and MCP wired into the agent?',
+  'As a coach, how would an underdog beat a stronger team?',
 ]
 
 // Which agent workflow each sample question is designed to showcase. Shown as a
@@ -77,6 +77,6 @@ export const SAMPLE_WORKFLOW_NOTES: Record<string, string> = {
     '🧩 This response uses the skill workflow — the agent reads its own architecture docs.',
   'What World Cup matches are on the schedule today?':
     '🛰️ This response uses the MCP workflow — live data from the football tools.',
-  'How are RAG and MCP wired into the agent?':
-    '🧩 This response uses the skill workflow — the agent explains how it is wired.',
+  'As a coach, how would an underdog beat a stronger team?':
+    '🧠 This response uses LLM reasoning — the coach answers from its own football expertise, no tool needed.',
 }

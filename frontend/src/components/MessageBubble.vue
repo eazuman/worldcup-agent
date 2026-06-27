@@ -8,6 +8,7 @@ const props = defineProps<{
   tool?: string
   pending?: boolean
   note?: boolean
+  footnote?: string
 }>()
 
 const BADGE: Record<AnswerSource, { label: string; cls: string }> = {
@@ -30,6 +31,7 @@ const BADGE: Record<AnswerSource, { label: string; cls: string }> = {
       </div>
       <p v-if="props.pending" class="dots"><span>·</span><span>·</span><span>·</span></p>
       <p v-else class="text">{{ props.text }}</p>
+      <p v-if="!props.pending && props.footnote" class="footnote">{{ props.footnote }}</p>
     </div>
   </div>
 </template>
@@ -113,6 +115,14 @@ const BADGE: Record<AnswerSource, { label: string; cls: string }> = {
 .text {
   margin: 0;
   white-space: pre-wrap;
+}
+.footnote {
+  margin: 0.55rem 0 0;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  font-size: 0.68rem;
+  font-style: italic;
+  color: #94a3b8;
 }
 .dots span {
   animation: blink 1.2s infinite;

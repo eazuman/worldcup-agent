@@ -5,10 +5,13 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from rag.embeddings import get_embeddings
 from rag.ingest import index_text, ingest_corpus
@@ -19,6 +22,11 @@ load_dotenv()
 
 TOP_K = 3
 LLM_MODEL = "gemini-2.5-flash"
+
+# Per-IP rate limit for the (expensive) chat endpoint. Abusive clients that
+# exceed this get HTTP 429 instead of running up LLM cost. Override with the
+# CHAT_RATE_LIMIT env var (slowapi syntax, e.g. "15/minute", "100/hour").
+CHAT_RATE_LIMIT = os.getenv("CHAT_RATE_LIMIT", "15/minute")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 CHROMA_DIR = BASE_DIR / "data" / "chroma_db"
@@ -32,7 +40,29 @@ vector_store = CorpusVectorStore(path=str(CHROMA_DIR), embeddings=embeddings)
 _rag_service: RAGService | None = None
 _agent = None  # compiled LangGraph agent, built lazily (needs GOOGLE_API_KEY)
 
+
+def _client_ip(request: Request) -> str:
+    """Real client IP for rate limiting.
+
+    Behind Cloudflare / HF Spaces the direct peer is a proxy, so prefer the
+    first hop in X-Forwarded-For (or Cloudflare's CF-Connecting-IP) and fall
+    back to the socket address for local/dev requests.
+    """
+    cf_ip = request.headers.get("cf-connecting-ip")
+    if cf_ip:
+        return cf_ip.strip()
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return get_remote_address(request)
+
+
+# In-memory per-IP rate limiter.
+limiter = Limiter(key_func=_client_ip)
+
 app = FastAPI(title="GoldenGoal RAG API", version="0.1.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Allowed browser origins for the API. Defaults cover local dev; in production
 # set FRONTEND_ORIGINS (comma-separated). Any Cloudflare Pages / Vercel / HF
@@ -142,8 +172,13 @@ async def ingest_corpus_endpoint() -> dict:
 
 
 @app.post("/ask")
-async def ask(payload: AskRequest) -> dict:
-    """Answer a question using top-K retrieved chunks from the indexed corpus."""
+@limiter.limit(CHAT_RATE_LIMIT)
+async def ask(request: Request, payload: AskRequest) -> dict:
+    """Answer a question using top-K retrieved chunks from the indexed corpus.
+
+    Rate-limited per client IP (see CHAT_RATE_LIMIT) since it calls Gemini;
+    over-limit callers get HTTP 429.
+    """
     question = payload.question.strip()
     if not question:
         raise HTTPException(status_code=400, detail="question cannot be empty")
@@ -180,11 +215,14 @@ def _chunk_text(chunk) -> str:
 
 
 @app.post("/agent/chat")
-async def agent_chat(payload: AgentChatRequest) -> StreamingResponse:
+@limiter.limit(CHAT_RATE_LIMIT)
+async def agent_chat(request: Request, payload: AgentChatRequest) -> StreamingResponse:
     """Stream the coach agent's response token-by-token over Server-Sent Events.
 
-    Emits JSON frames: {type: "token", content}, {type: "tool_start"|"tool_end",
-    name}, {type: "done"}, or {type: "error", detail}.
+    Rate-limited per client IP (see CHAT_RATE_LIMIT) to curb abuse / runaway
+    cost; over-limit callers get HTTP 429. Emits JSON frames: {type: "token",
+    content}, {type: "tool_start"|"tool_end", name}, {type: "done"}, or
+    {type: "error", detail}.
     """
     agent = await get_agent()
     config = {"configurable": {"thread_id": payload.thread_id}}
