@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { GROUPS, type TeamRow } from '../api/footballMock'
+import { computed, onMounted, ref } from 'vue'
+import { type TeamRow, type Group } from '../api/footballMock'
+import { fetchStandings } from '../api/football'
+
+const rawGroups = ref<Group[]>([])
+const source = ref<'live' | 'sample'>('sample')
 
 function sortTable(table: TeamRow[]): TeamRow[] {
   return [...table].sort(
@@ -9,8 +13,14 @@ function sortTable(table: TeamRow[]): TeamRow[] {
 }
 
 const groups = computed(() =>
-  GROUPS.map((g) => ({ name: g.name, table: sortTable(g.table) })),
+  rawGroups.value.map((g) => ({ name: g.name, table: sortTable(g.table) })),
 )
+
+onMounted(async () => {
+  const res = await fetchStandings()
+  rawGroups.value = res.groups
+  source.value = res.source
+})
 </script>
 
 <template>
@@ -18,6 +28,7 @@ const groups = computed(() =>
     <div class="hint">
       <span class="dot qualify"></span> Top 2 advance
       <span class="dot third"></span> Best 8 third-placed teams also advance · 48 teams · 12 groups
+      <span class="src" :class="source">{{ source === 'live' ? '● live' : 'sample data' }}</span>
     </div>
 
     <div class="grid">
@@ -87,6 +98,22 @@ const groups = computed(() =>
 }
 .dot.third {
   background: #eab308;
+}
+.src {
+  margin-left: auto;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+}
+.src.live {
+  background: #14532d;
+  color: #86efac;
+}
+.src.sample {
+  background: #422006;
+  color: #fdba74;
 }
 .grid {
   display: grid;

@@ -1,6 +1,7 @@
-# Agent (planned — Phase 5)
+# Agent
 
-> Status: **planned**. This describes the intended design, not yet implemented.
+> Status: **implemented**. The agent is built with `langchain.agents.create_agent`
+> in `backend/app/agent.py` and exposed over `POST /agent/chat` (SSE streaming).
 
 ## Role
 
@@ -18,8 +19,8 @@ question, which to use and how to combine them.
    stable World Cup knowledge questions from the indexed corpus.
 2. **MCP tools** — live football data, loaded from the FastMCP server via
    `langchain-mcp-adapters`.
-3. **(Optional) architecture self-docs** — this skill, for questions about how
-   the app itself is built.
+3. **Architecture self-docs** — the `explain_goldengoal_setup` tool, backed by
+   this skill, for questions about how the app itself is built.
 
 ## Routing logic (intended)
 

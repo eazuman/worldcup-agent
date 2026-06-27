@@ -45,6 +45,12 @@ const CANNED: Record<AnswerSource, { tool: string; reply: string }> = {
       '🧠 [MOCK AGENT] I would combine historical context (RAG) with live data (MCP) to answer this. ' +
       'This is dummy data — Phase 5 wires the real agent.',
   },
+  mcp: {
+    tool: 'get_live_scores · MCP → football-data.org',
+    reply:
+      '🛰️ [MOCK MCP] Live scores, standings and fixtures come from the MCP football server. ' +
+      'This is dummy data — Phase 4 wires the real MCP football tools.',
+  },
 }
 
 export async function askMock(question: string): Promise<AskResponse> {
@@ -56,9 +62,8 @@ export async function askMock(question: string): Promise<AskResponse> {
 }
 
 export const SAMPLE_QUESTIONS = [
-  "What's the format of the 48-team 2026 World Cup?",
-  'What matches are on today?',
-  'Show the current Group D standings.',
-  "Compare Brazil's current form to their 2022 campaign.",
   'Which country has won the most World Cups?',
+  'How is the GoldenGoal agent set up — walk me through how it works?',
+  'What World Cup matches are on the schedule today?',
+  'How do the RAG knowledge base and MCP football tools connect to the agent?',
 ]

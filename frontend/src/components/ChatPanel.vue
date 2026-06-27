@@ -11,9 +11,12 @@ const messages = ref<ChatMessage[]>([
     role: 'assistant',
     text:
       "Hey! I'm your World Cup soccer coach. Ask me about the 2026 tournament — " +
-      "format, hosts, stadiums, team history. I answer from my World Cup knowledge base.",
+      "format, hosts, stadiums, team history.\n\n" +
+      '📚 History & facts come from my knowledge base (RAG). ' +
+      '🛰️ Live scores, standings & today’s schedule come from the MCP football server. ' +
+      '🧩 Ask how I’m built and I’ll explain my own setup (architecture skill).',
     source: 'agent',
-    tool: 'agent · RAG',
+    tool: 'Coach · knowledge base',
   },
 ])
 const input = ref('')
@@ -34,6 +37,10 @@ async function send(text?: string) {
   busy.value = true
 
   messages.value.push({ id: nextId++, role: 'user', text: question })
+
+  // The backend agent decides which tool(s) to call — RAG for historical /
+  // reference facts, MCP for live schedule / standings. The UI just streams
+  // whatever the agent produces and shows the tool it actually used.
   const pendingId = nextId++
   messages.value.push({
     id: pendingId,
@@ -41,7 +48,7 @@ async function send(text?: string) {
     text: '',
     pending: true,
     source: 'agent',
-    tool: 'agent · thinking…',
+    tool: 'Coach · thinking…',
   })
   await scrollToBottom()
 
@@ -60,7 +67,18 @@ async function send(text?: string) {
       scrollToBottom()
     },
     onTool: (name, phase) => {
-      if (phase === 'start') patch({ tool: `${name} · RAG`, pending: true })
+      // Show which capability the agent reached for. RAG = knowledge base,
+      // the architecture skill = self/meta docs, anything else = a live-data
+      // MCP football tool.
+      if (phase === 'start') {
+        const proto =
+          name === 'search_worldcup_knowledge'
+            ? 'RAG'
+            : name === 'read_skill_file'
+              ? 'SKILL'
+              : 'MCP'
+        patch({ tool: `${name} · ${proto}`, pending: true })
+      }
     },
     onError: (detail) => {
       patch({ text: answer || `⚠️ ${detail}`, pending: false })

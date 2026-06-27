@@ -1,0 +1,31 @@
+# Keep the backend image small and free of secrets / local cruft.
+
+# Secrets — provided as Space secrets at runtime, never baked into the image.
+.env
+.env.*
+
+# Version control / editor
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+
+# Python caches and virtualenvs
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+.venv/
+**/.pytest_cache/
+**/.mypy_cache/
+
+# Frontend (deployed separately to Cloudflare Pages)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Generated RAG index (rebuilt from data/corpus on first boot)
+data/chroma_db/
+
+# Logs
+*.log

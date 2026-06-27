@@ -1,6 +1,7 @@
-# MCP tools / server (planned — Phase 4)
+# MCP tools / server
 
-> Status: **planned**. This describes the intended design, not yet implemented.
+> Status: **implemented**. A FastMCP server in `mcp_server/football_tools.py`
+> exposes the football tools, loaded into the agent via `langchain-mcp-adapters`.
 
 ## Purpose
 

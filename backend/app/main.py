@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -33,13 +34,33 @@ _agent = None  # compiled LangGraph agent, built lazily (needs GOOGLE_API_KEY)
 
 app = FastAPI(title="GoldenGoal RAG API", version="0.1.0")
 
-# Allow the Vite dev server (frontend) to call this API from the browser.
+# Allowed browser origins for the API. Defaults cover local dev; in production
+# set FRONTEND_ORIGINS (comma-separated). Any Cloudflare Pages / Vercel / HF
+# Spaces deploy is also allowed via regex so previews work without reconfiguring.
+_DEFAULT_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.getenv("FRONTEND_ORIGINS", _DEFAULT_ORIGINS).split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.(pages\.dev|vercel\.app|hf\.space)",
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def _ensure_index() -> None:
+    """Rebuild the RAG index from the committed corpus on first boot.
+
+    The Chroma index is gitignored and rebuilt on deploy, so a fresh container
+    starts with an empty store — ingest the corpus once so RAG works immediately.
+    """
+    if vector_store.count() == 0:
+        ingest_corpus(vector_store)
 
 
 def _build_llm():
@@ -61,13 +82,16 @@ def get_rag_service() -> RAGService:
     return _rag_service
 
 
-def get_agent():
-    """Lazily build the compiled coach agent (needs GOOGLE_API_KEY)."""
+async def get_agent():
+    """Lazily build the compiled coach agent (needs GOOGLE_API_KEY).
+
+    Async because it loads the MCP football tools over stdio adapters.
+    """
     global _agent
     if _agent is None:
-        from app.agent import build_agent
+        from app.agent import build_agent_async
 
-        _agent = build_agent(vector_store=vector_store, llm=_build_llm())
+        _agent = await build_agent_async(vector_store=vector_store, llm=_build_llm())
     return _agent
 
 
@@ -162,7 +186,7 @@ async def agent_chat(payload: AgentChatRequest) -> StreamingResponse:
     Emits JSON frames: {type: "token", content}, {type: "tool_start"|"tool_end",
     name}, {type: "done"}, or {type: "error", detail}.
     """
-    agent = get_agent()
+    agent = await get_agent()
     config = {"configurable": {"thread_id": payload.thread_id}}
     inputs = {"messages": [{"role": "user", "content": payload.question}]}
 
@@ -189,6 +213,36 @@ async def agent_chat(payload: AgentChatRequest) -> StreamingResponse:
 async def health() -> dict:
     """Return basic service health and the number of indexed chunks."""
     return {"status": "ok", "chunks_indexed": vector_store.count()}
+
+
+@app.get("/standings")
+async def standings() -> dict:
+    """Structured World Cup group standings for the Standings view.
+
+    Returns {source: "live"|"sample", groups: [...]}. On any API error it
+    degrades to sample so the frontend can fall back to its built-in data.
+    """
+    from app.football import get_standings_data
+
+    try:
+        return get_standings_data()
+    except Exception as exc:  # noqa: BLE001 - degrade to sample on any error
+        return {"source": "sample", "groups": [], "error": str(exc)[:160]}
+
+
+@app.get("/schedule")
+async def schedule() -> dict:
+    """Structured World Cup fixtures for the Schedule view.
+
+    Returns {source: "live"|"sample", fixtures: [...]}. On any API error it
+    degrades to sample so the frontend can fall back to its built-in data.
+    """
+    from app.football import get_schedule_data
+
+    try:
+        return get_schedule_data()
+    except Exception as exc:  # noqa: BLE001 - degrade to sample on any error
+        return {"source": "sample", "fixtures": [], "error": str(exc)[:160]}
 
 
 @app.get("/debug/chunks")

@@ -5,9 +5,9 @@ const emit = defineEmits<{ done: [] }>()
 const hiding = ref(false)
 
 onMounted(() => {
-  // Start fade-out near the end of the ball animation, then unmount.
-  window.setTimeout(() => (hiding.value = true), 2600)
-  window.setTimeout(() => emit('done'), 3200)
+  // Start fade-out after the ball returns and the title settles, then unmount.
+  window.setTimeout(() => (hiding.value = true), 3000)
+  window.setTimeout(() => emit('done'), 3600)
 })
 </script>
 
@@ -33,14 +33,21 @@ onMounted(() => {
       <span class="post post-back"></span>
     </div>
 
-    <!-- Footballs kicked in from both sides -->
-    <span class="ball ball-left">⚽</span>
-    <span class="ball ball-right">⚽</span>
+    <!-- One ball appears in the center, then splits toward each goal -->
+    <span class="ball ball-core" aria-hidden="true">⚽</span>
+    <span class="ball ball-fly ball-fly-left" aria-hidden="true">⚽</span>
+    <span class="ball ball-fly ball-fly-right" aria-hidden="true">⚽</span>
 
-    <!-- Impact flash + title -->
-    <div class="flash"></div>
+    <!-- Impact flashes at each goal -->
+    <div class="flash flash-left"></div>
+    <div class="flash flash-right"></div>
+
+    <!-- Title reveal — the balls return as the two "o" letters -->
     <div class="title">
-      <span class="word">Golden</span><span class="word gold">Goal</span>
+      <span class="word">G<span class="o-ball" aria-hidden="true">⚽</span>lden</span><span
+        class="word gold"
+        >G<span class="o-ball" aria-hidden="true">⚽</span>al</span
+      >
       <div class="tag">World Cup 2026 AI</div>
     </div>
   </div>
@@ -165,27 +172,44 @@ onMounted(() => {
 .ball {
   position: absolute;
   top: 50%;
+  left: 50%;
   font-size: clamp(3rem, 6vw, 4.2rem);
+  line-height: 1;
   filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.55));
 }
-.ball-left {
-  left: clamp(70px, 9vw, 120px);
-  animation: kickRight 1.5s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+/* Single ball that pops in the center, then fades as it splits */
+.ball-core {
+  transform: translate(-50%, -50%) scale(0);
+  animation: coreIn 0.8s cubic-bezier(0.2, 1.3, 0.4, 1) forwards;
 }
-.ball-right {
-  right: clamp(70px, 9vw, 120px);
-  animation: kickLeft 1.5s cubic-bezier(0.2, 0.7, 0.3, 1) 0.25s forwards;
+/* The two balls that fly out to each goal, then return to the centre */
+.ball-fly {
+  opacity: 0;
+}
+.ball-fly-left {
+  animation: flyLeft 1.6s cubic-bezier(0.25, 0.6, 0.3, 1) 0.55s forwards;
+}
+.ball-fly-right {
+  animation: flyRight 1.6s cubic-bezier(0.25, 0.6, 0.3, 1) 0.55s forwards;
 }
 
-/* Impact flash where they meet */
+/* Impact flashes at each goal */
 .flash {
   position: absolute;
+  top: 50%;
   width: 22px;
   height: 22px;
   border-radius: 50%;
   background: #fde68a;
   opacity: 0;
-  animation: flash 0.5s ease 1.7s forwards;
+  transform: translateY(-50%);
+  animation: flash 0.5s ease 1.45s forwards;
+}
+.flash-left {
+  left: clamp(74px, 9vw, 124px);
+}
+.flash-right {
+  right: clamp(74px, 9vw, 124px);
 }
 
 /* Title reveal */
@@ -194,7 +218,7 @@ onMounted(() => {
   text-align: center;
   opacity: 0;
   transform: scale(0.6);
-  animation: titleIn 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) 1.85s forwards;
+  animation: titleIn 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) 2s forwards;
   text-shadow: 0 6px 26px rgba(0, 0, 0, 0.45);
 }
 .word {
@@ -214,6 +238,17 @@ onMounted(() => {
   -webkit-text-fill-color: transparent;
   filter: drop-shadow(0 4px 14px rgba(245, 158, 11, 0.45));
 }
+/* The "o" letters rendered as footballs that spin into place */
+.o-ball {
+  display: inline-block;
+  font-size: 0.82em;
+  line-height: 1;
+  vertical-align: -0.06em;
+  margin: 0 0.02em;
+  -webkit-text-fill-color: initial;
+  transform: scale(0) rotate(-220deg);
+  animation: oBallIn 0.6s cubic-bezier(0.2, 1.5, 0.4, 1) 2.1s forwards;
+}
 .tag {
   margin-top: 0.5rem;
   font-family: var(--font-display);
@@ -224,36 +259,84 @@ onMounted(() => {
   color: #e2e8f0;
 }
 
-@keyframes kickRight {
+@keyframes coreIn {
   0% {
-    transform: translate(0, -50%) rotate(0deg);
+    transform: translate(-50%, -50%) scale(0) rotate(0deg);
+    opacity: 0;
+  }
+  45% {
+    transform: translate(-50%, -50%) scale(1.15) rotate(160deg);
+    opacity: 1;
+  }
+  70% {
+    transform: translate(-50%, -50%) scale(1) rotate(220deg);
+    opacity: 1;
   }
   100% {
-    transform: translate(calc(50vw - clamp(120px, 13vw, 170px)), -50%) rotate(1080deg);
+    transform: translate(-50%, -50%) scale(0.55) rotate(320deg);
+    opacity: 0;
   }
 }
-@keyframes kickLeft {
+@keyframes flyLeft {
   0% {
-    transform: translate(0, -50%) rotate(0deg);
+    transform: translate(-50%, -50%) translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, -50%) translateX(calc(-50vw + clamp(110px, 13vw, 170px)))
+      rotate(-760deg);
+    opacity: 1;
+  }
+  60% {
+    transform: translate(-50%, -50%) translateX(calc(-50vw + clamp(110px, 13vw, 170px)))
+      rotate(-760deg);
+    opacity: 1;
   }
   100% {
-    transform: translate(calc(-50vw + clamp(120px, 13vw, 170px)), -50%) rotate(-1080deg);
+    transform: translate(-50%, -50%) translateX(0) rotate(-1440deg);
+    opacity: 0;
+  }
+}
+@keyframes flyRight {
+  0% {
+    transform: translate(-50%, -50%) translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, -50%) translateX(calc(50vw - clamp(110px, 13vw, 170px)))
+      rotate(760deg);
+    opacity: 1;
+  }
+  60% {
+    transform: translate(-50%, -50%) translateX(calc(50vw - clamp(110px, 13vw, 170px)))
+      rotate(760deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) translateX(0) rotate(1440deg);
+    opacity: 0;
   }
 }
 @keyframes flash {
   0% {
     opacity: 0;
-    transform: scale(0.3);
+    transform: translateY(-50%) scale(0.3);
     box-shadow: 0 0 0 0 rgba(253, 230, 138, 0.7);
   }
   40% {
     opacity: 1;
-    transform: scale(1);
+    transform: translateY(-50%) scale(1);
     box-shadow: 0 0 50px 22px rgba(253, 230, 138, 0.55);
   }
   100% {
     opacity: 0;
-    transform: scale(2.6);
+    transform: translateY(-50%) scale(2.6);
     box-shadow: 0 0 70px 34px rgba(253, 230, 138, 0);
   }
 }
@@ -261,6 +344,11 @@ onMounted(() => {
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+@keyframes oBallIn {
+  to {
+    transform: scale(1) rotate(0deg);
   }
 }
 @keyframes goalIn {
@@ -273,6 +361,10 @@ onMounted(() => {
   .ball,
   .flash {
     display: none;
+  }
+  .o-ball {
+    animation: none;
+    transform: none;
   }
   .title {
     animation: titleIn 0.4s ease forwards;

@@ -23,6 +23,7 @@ export interface Fixture {
   id: number
   date: string // ISO date
   time: string // UTC kickoff
+  kickoff?: string // full UTC ISO timestamp (e.g. 2026-06-26T02:00:00Z)
   stage: string
   group?: string
   home: { team: string; flag: string }

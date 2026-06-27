@@ -6,22 +6,21 @@ GoldenGoal is a World Cup 2026 assistant. It is a monorepo with three parts:
   schedule). Currently renders mock data; talks to the backend over HTTP.
 - **backend/** — FastAPI service exposing the RAG API and (later) the agent.
   Dependencies are managed with `uv` (`pyproject.toml` + `uv.lock`), Python 3.12.
-- **mcp_server/** — a FastMCP server (planned) exposing live football data as
-  MCP tools.
+- **mcp_server/** — a FastMCP server exposing live football data as MCP tools.
 
 ## Knowledge sources (the core idea)
 
 The assistant separates knowledge by *shape*:
 
 - **RAG** = stable, unstructured **text** knowledge (World Cup rules, history,
-  host cities, teams). Retrieved by semantic similarity. Implemented today.
+  host cities, teams). Retrieved by semantic similarity.
 - **MCP tools** = **live / structured** data and actions (scores, standings,
-  fixtures) fetched from an API at query time. Planned (Phase 4).
+  fixtures) fetched from an API at query time.
 - **Architecture self-docs** = this skill — curated text read verbatim, not
   embedded.
 
-An orchestrating **agent** (planned, Phase 5) decides which source to use per
-question and composes the answer.
+An orchestrating **agent** decides which source to use per question and composes
+the answer.
 
 ## Request flow (today, RAG API)
 
@@ -43,8 +42,8 @@ Client -> Agent
 
 ## Key technologies
 
-- FastAPI, LangChain (LCEL), Chroma vector store
+- FastAPI, LangChain (LCEL + agent), Chroma vector store
 - Embeddings: local `sentence-transformers/all-MiniLM-L6-v2` (no API key)
 - LLM: Google Gemini `gemini-2.5-flash` via `langchain-google-genai`
-- MCP: FastMCP + `langchain-mcp-adapters` (planned)
+- MCP: FastMCP + `langchain-mcp-adapters`
 - Tooling: `uv`, Python 3.12

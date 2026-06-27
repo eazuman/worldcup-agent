@@ -1,20 +1,30 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import ChatPanel from './components/ChatPanel.vue'
 import StandingsView from './components/StandingsView.vue'
 import ScheduleView from './components/ScheduleView.vue'
 import IntroSplash from './components/IntroSplash.vue'
+import { fetchDataMode } from './api/football'
 
 type Tab = 'chat' | 'standings' | 'schedule'
 
 const tab = ref<Tab>('chat')
 const showIntro = ref(true)
+const dataMode = ref<'live' | 'sample'>('sample')
 
 const tabs: { id: Tab; label: string; icon: string }[] = [
   { id: 'chat', label: 'Ask AI', icon: '💬' },
+  { id: 'schedule', label: 'Schedule & Scores', icon: '🗓️' },
   { id: 'standings', label: 'Standings', icon: '📊' },
-  { id: 'schedule', label: 'Schedule', icon: '🗓️' },
 ]
+
+onMounted(async () => {
+  try {
+    dataMode.value = await fetchDataMode()
+  } catch {
+    dataMode.value = 'sample'
+  }
+})
 </script>
 
 <template>
@@ -29,7 +39,7 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
     <header class="header">
       <div class="brand">
         <span class="logo" aria-hidden="true">
-          <svg viewBox="0 0 48 48" width="40" height="40">
+          <svg viewBox="0 0 64 64" width="40" height="40" role="img" aria-label="Soccer ball">
             <defs>
               <radialGradient id="ggBall" cx="38%" cy="32%" r="75%">
                 <stop offset="0%" stop-color="#fff7d6" />
@@ -37,26 +47,26 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
                 <stop offset="100%" stop-color="#b45309" />
               </radialGradient>
             </defs>
-            <circle cx="24" cy="24" r="21" fill="url(#ggBall)" stroke="#78350f" stroke-width="1.5" />
-            <path
-              d="M24 13l6 4.4-2.3 7.1h-7.4L18 17.4 24 13z"
-              fill="#1e293b"
-            />
-            <path
-              d="M24 13l6 4.4M24 13l-6 4.4M30 17.4l5.6-1.4M18 17.4l-5.6-1.4M27.7 24.5l4 5.6M20.3 24.5l-4 5.6M24 32l3 4M24 32l-3 4"
-              stroke="#1e293b"
-              stroke-width="1.4"
-              fill="none"
-              stroke-linecap="round"
-            />
+            <circle cx="32" cy="32" r="29" fill="url(#ggBall)" stroke="#78350f" stroke-width="2" />
+            <!-- classic soccer-ball pattern: centre pentagon + seams to the edge -->
+            <polygon points="32,23 40.6,29.2 37.3,39.3 26.7,39.3 23.4,29.2" fill="#1f2937" />
+            <g stroke="#1f2937" stroke-width="2.2" fill="none" stroke-linecap="round">
+              <line x1="32" y1="23" x2="32" y2="7" />
+              <line x1="40.6" y1="29.2" x2="56" y2="24" />
+              <line x1="37.3" y1="39.3" x2="46" y2="53" />
+              <line x1="26.7" y1="39.3" x2="18" y2="53" />
+              <line x1="23.4" y1="29.2" x2="8" y2="24" />
+            </g>
           </svg>
         </span>
         <div class="brand-text">
-          <h1>Golden<span class="gold">Goal</span></h1>
+          <h1>G<span class="o-ball" aria-hidden="true">⚽</span>lden<span class="gold">G<span class="o-ball" aria-hidden="true">⚽</span>al</span></h1>
           <p>World Cup 2026 · RAG + MCP + Agent</p>
         </div>
       </div>
-      <span class="phase">Phase 1 · mock data</span>
+      <span class="phase" :class="dataMode === 'live' ? 'phase-live' : 'phase-mock'">
+        {{ dataMode === 'live' ? '● live data' : '● mock data' }}
+      </span>
     </header>
 
     <section class="hero" aria-label="World Cup 2026">
@@ -71,8 +81,11 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
         <span class="flag">🇨🇦</span>
         <span class="flag">🇲🇽</span>
       </div>
-      <span class="hero-ball hero-ball-1" aria-hidden="true">⚽</span>
-      <span class="hero-ball hero-ball-2" aria-hidden="true">🏆</span>
+      <div class="hero-scene" aria-hidden="true">
+        <span class="hero-trophy">🏆</span>
+        <span class="hero-ball">⚽</span>
+        <span class="hero-ball-shadow"></span>
+      </div>
     </section>
 
     <nav class="tabs">
@@ -180,6 +193,20 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+.brand-text h1 .o-ball {
+  display: inline-block;
+  font-size: 0.86em;
+  line-height: 1;
+  vertical-align: -0.04em;
+  margin: 0 0.01em;
+  -webkit-text-fill-color: initial;
+  animation: brandBallSpin 9s linear infinite;
+}
+@keyframes brandBallSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .brand-text p {
   margin: 0;
   font-family: var(--font-display);
@@ -193,12 +220,19 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
   font-size: 0.64rem;
   font-weight: 600;
   letter-spacing: 0.03em;
-  color: #fbbf24;
-  border: 1px solid rgba(120, 53, 15, 0.8);
-  background: rgba(69, 26, 3, 0.6);
   padding: 0.25rem 0.6rem;
   border-radius: 999px;
   white-space: nowrap;
+}
+.phase-mock {
+  color: #fbbf24;
+  border: 1px solid rgba(120, 53, 15, 0.8);
+  background: rgba(69, 26, 3, 0.6);
+}
+.phase-live {
+  color: #86efac;
+  border: 1px solid rgba(21, 128, 61, 0.8);
+  background: rgba(20, 83, 45, 0.55);
 }
 
 /* ---- Hero banner ---- */
@@ -274,36 +308,80 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
   font-size: 1.15rem;
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
 }
+/* ---- Hero scene: trophy + bouncing ball ---- */
+.hero-scene {
+  position: absolute;
+  right: 1.2rem;
+  bottom: 0.4rem;
+  z-index: 1;
+  width: 7.5rem;
+  height: 4.2rem;
+  pointer-events: none;
+}
+.hero-trophy {
+  position: absolute;
+  left: 0.2rem;
+  bottom: 0.3rem;
+  font-size: 2.2rem;
+  filter: drop-shadow(0 4px 10px rgba(180, 83, 9, 0.5));
+  animation: trophyBob 3.4s ease-in-out infinite;
+}
 .hero-ball {
   position: absolute;
-  pointer-events: none;
-  opacity: 0.9;
-  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.45));
+  right: 0.7rem;
+  bottom: 0.5rem;
+  font-size: 3rem;
+  transform-origin: 50% 100%;
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.35));
+  animation: ballBounce 1.8s ease-in-out infinite;
 }
-.hero-ball-1 {
-  right: 1.4rem;
-  bottom: -0.6rem;
-  font-size: 3.2rem;
-  animation: floatBall 4s ease-in-out infinite;
+.hero-ball-shadow {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.35rem;
+  width: 2.3rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0));
+  animation: ballShadow 1.8s ease-in-out infinite;
 }
-.hero-ball-2 {
-  right: 5.2rem;
-  top: 2.4rem;
-  font-size: 1.5rem;
-  opacity: 0.85;
-  animation: floatBall 5s ease-in-out infinite 0.6s;
-}
-@keyframes floatBall {
+@keyframes ballBounce {
   0%, 100% {
-    transform: translateY(0) rotate(0deg);
+    transform: translateY(0) scale(1.04, 0.96); /* gentle squash on contact */
+  }
+  18% {
+    transform: translateY(0) scale(1, 1);
   }
   50% {
-    transform: translateY(-8px) rotate(12deg);
+    transform: translateY(-12px) scale(1, 1); /* slight lift, no spin */
+  }
+}
+@keyframes ballShadow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(0.7);
+    opacity: 0.28;
+  }
+}
+@keyframes trophyBob {
+  0%, 100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(3deg);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hero-ball {
+  .hero-ball,
+  .hero-ball-shadow,
+  .hero-trophy {
     animation: none;
+  }
+  .hero-ball {
+    transform: translateY(0);
   }
 }
 .tabs {

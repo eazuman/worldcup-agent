@@ -12,7 +12,8 @@ const props = defineProps<{
 const BADGE: Record<AnswerSource, { label: string; cls: string }> = {
   live: { label: 'LIVE', cls: 'badge-live' },
   rag: { label: 'RAG', cls: 'badge-rag' },
-  agent: { label: 'AGENT', cls: 'badge-agent' },
+  agent: { label: 'COACH', cls: 'badge-agent' },
+  mcp: { label: 'MCP', cls: 'badge-mcp' },
 }
 </script>
 
@@ -77,6 +78,10 @@ const BADGE: Record<AnswerSource, { label: string; cls: string }> = {
 .badge-agent {
   background: #4c1d95;
   color: #ddd6fe;
+}
+.badge-mcp {
+  background: #78350f;
+  color: #fed7aa;
 }
 .tool {
   font-size: 0.68rem;

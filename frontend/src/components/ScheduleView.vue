@@ -1,12 +1,54 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { FIXTURES, type Fixture } from '../api/footballMock'
+import { computed, onMounted, ref } from 'vue'
+import { type Fixture } from '../api/footballMock'
+import { fetchSchedule } from '../api/football'
+
+const fixtures = ref<Fixture[]>([])
+const source = ref<'live' | 'sample'>('sample')
+
+// Local timezone label (e.g. "PDT", "GMT+5:30") shown next to kickoff times.
+const tzLabel = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })
+  .formatToParts(new Date())
+  .find((p) => p.type === 'timeZoneName')?.value ?? 'local'
+
+// Local calendar date (YYYY-MM-DD) used for grouping, derived from the UTC
+// kickoff when available so matches land on the viewer's local day.
+function localDateKey(f: Fixture): string {
+  if (!f.kickoff) return f.date
+  return dateKeyOf(new Date(f.kickoff))
+}
+
+// Kickoff time in the browser's local timezone (falls back to the UTC field).
+function localTime(f: Fixture): string {
+  if (!f.kickoff) return `${f.time} UTC`
+  const t = new Date(f.kickoff).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  return `${t} ${tzLabel}`
+}
+
+// Local "today" key — fixtures before this local day are hidden so the view
+// starts from today onwards (what's happening now / next).
+function dateKeyOf(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+const todayKey = dateKeyOf(new Date())
 
 const grouped = computed(() => {
   const map = new Map<string, Fixture[]>()
-  for (const f of FIXTURES) {
-    if (!map.has(f.date)) map.set(f.date, [])
-    map.get(f.date)!.push(f)
+  for (const f of fixtures.value) {
+    const key = localDateKey(f)
+    if (key < todayKey) continue // skip past (local) days
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(f)
+  }
+  // Sort days, and matches within each day by local kickoff time.
+  for (const list of map.values()) {
+    list.sort((a, b) => (a.kickoff ?? a.time).localeCompare(b.kickoff ?? b.time))
   }
   return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
 })
@@ -18,10 +60,19 @@ function prettyDate(iso: string): string {
     day: 'numeric',
   })
 }
+
+onMounted(async () => {
+  const res = await fetchSchedule()
+  fixtures.value = res.fixtures
+  source.value = res.source
+})
 </script>
 
 <template>
   <div class="schedule">
+    <div class="src-row">
+      <span class="src" :class="source">{{ source === 'live' ? '● live' : 'sample data' }}</span>
+    </div>
     <div v-for="[date, matches] in grouped" :key="date" class="day">
       <h3 class="day-head">{{ prettyDate(date) }}</h3>
 
@@ -34,7 +85,7 @@ function prettyDate(iso: string): string {
         <div class="meta">
           <span class="stage">{{ m.stage }}<template v-if="m.group"> · Group {{ m.group }}</template></span>
           <span v-if="m.status === 'LIVE'" class="live-badge">● LIVE</span>
-          <span v-else class="kickoff">{{ m.time }} UTC</span>
+          <span v-else class="kickoff">{{ localTime(m) }}</span>
         </div>
 
         <div class="teams">
@@ -69,6 +120,26 @@ function prettyDate(iso: string): string {
   height: 100%;
   overflow-y: auto;
   padding: 1rem 1.1rem 2rem;
+}
+.src-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.6rem;
+}
+.src {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+}
+.src.live {
+  background: #14532d;
+  color: #86efac;
+}
+.src.sample {
+  background: #422006;
+  color: #fdba74;
 }
 .day {
   margin-bottom: 1.4rem;

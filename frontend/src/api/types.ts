@@ -1,4 +1,4 @@
-export type AnswerSource = 'rag' | 'live' | 'agent'
+export type AnswerSource = 'rag' | 'live' | 'agent' | 'mcp'
 
 export interface AskResponse {
   answer: string

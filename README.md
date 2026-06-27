@@ -1,3 +1,13 @@
+---
+title: GoldenGoal
+emoji: ⚽
+colorFrom: green
+colorTo: yellow
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # GoldenGoal — World Cup 2026 AI Agent
 
 An agentic **RAG + MCP + Agent + Vue** demo built around the FIFA World Cup 2026, running on free tiers.

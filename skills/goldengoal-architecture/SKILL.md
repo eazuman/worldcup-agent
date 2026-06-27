@@ -43,6 +43,7 @@ Read the file that matches the question:
 
 ## Status note
 
-The RAG pipeline and data pipeline are **implemented**. The MCP tools and the
-orchestrating agent are **planned** (Phases 4–5); their reference files describe
-the intended design and are marked accordingly.
+The RAG pipeline, data pipeline, MCP football tools, and the orchestrating agent
+are all **implemented**. The agent (Google Gemini `gemini-2.5-flash`) routes each
+question to the RAG knowledge base, the MCP football tools, or this architecture
+skill, and can combine them.
