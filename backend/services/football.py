@@ -162,3 +162,34 @@ def get_schedule_data() -> dict:
         fixtures.append(fixture)
     return {"source": "live", "fixtures": fixtures}
 
+
+def get_scorers_data() -> dict:
+    """Return {source, scorers:[{player, team, goals, flag}]} from football-data.org.
+
+    Used by the champion-prediction heuristic to credit each team's golden-boot
+    striker. Degrades to ``source: "sample"`` with no key configured.
+    """
+    if not USE_FD:
+        return {"source": "sample", "scorers": []}
+    resp = httpx.get(
+        f"{FD_BASE}/competitions/{FD_COMP}/scorers",
+        headers={"X-Auth-Token": FD_KEY},
+        params={"limit": 10},
+        timeout=15.0,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    scorers: list[dict] = []
+    for s in data.get("scorers", []):
+        player = (s.get("player") or {}).get("name", "?")
+        team = (s.get("team") or {}).get("name", "?")
+        scorers.append(
+            {
+                "player": player,
+                "team": team,
+                "goals": s.get("goals", 0) or 0,
+                "flag": _flag(team),
+            }
+        )
+    return {"source": "live", "scorers": scorers}
+

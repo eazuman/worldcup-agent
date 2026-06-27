@@ -10,96 +10,166 @@ pinned: false
 
 # GoldenGoal — World Cup 2026 AI Agent
 
-An agentic **RAG + MCP + Agent + Vue** demo built around the FIFA World Cup 2026, running on free tiers.
+GoldenGoal is an AI **soccer coach** for the FIFA World Cup 2026. Ask it anything
+about the tournament and a **LangChain agent** (Google Gemini, tool-calling)
+decides how to answer:
 
-![GoldenGoal — Ask AI chat view with live/RAG source badges](docs/screenshot-chat.png)
+- **Historical / reference facts** (formats, rules, hosts, stadiums, past
+  winners, team history) → answered from a **RAG** knowledge base built from
+  curated Wikipedia pages.
+- **Live / current data** (today's fixtures, group standings, live scores, top
+  scorers) → answered from **MCP football tools** that call live football APIs.
+- **"How are you built?"** meta questions → answered from a curated **skill**
+  (verbatim architecture docs about this app).
 
-> ### 🚧 Current status: Phase 1 — UI on mock data
-> This repository currently ships the **Vue 3 frontend only**, answering questions with
-> **mock/dummy data** (see [`frontend/src/api/mock.ts`](frontend/src/api/mock.ts)). It is an
-> **interview showcase** of the intended architecture and UX. The backend, RAG pipeline, MCP
-> football tools, and the agent orchestration layer are **planned next** — the UI is already
-> wired against a stable `AskResponse` contract so the mock can be swapped for the real agent
-> without UI changes. See the [Build phases](#build-phases) and [Target architecture](#target-architecture) below.
+The whole thing runs on **free tiers**: the backend is a FastAPI app deployed as
+a Hugging Face Docker Space; the Vue frontend is a static SPA. Answers stream
+token-by-token over Server-Sent Events.
 
-- **Agent:** LangChain agent driven by Gemini tool-calling — routes each question to RAG and/or live tools
-- **LLM:** Google Gemini `gemini-2.5-flash` (free tier)
-- **Backend:** FastAPI (`/ask`, `/health`)
-- **MCP connector:** `langchain-mcp-adapters` — exposes the MCP tools to the LangChain agent as tools
-- **MCP server:** FastMCP football tools (separate process): `get_fixtures`, `get_standings`, `get_top_scorers`, `get_results_on_date`
-- **Live data:** football-data.org (primary), TheSportsDB + openfootball (fallbacks)
-- **Embeddings:** local `all-MiniLM-L6-v2` (no API cost)
-- **Vector store:** Chroma (local)
-- **Frontend:** Vue 3 + Vite
+## Tech stack
 
+| Layer | Choice | Notes |
+|---|---|---|
+| **Frontend** | Vue 3 + Vite + TypeScript | Chat UI + Standings/Schedule views; SSE streaming |
+| **Backend** | FastAPI (Python 3.12, `uv`) | `/agent/chat`, `/ask`, `/health`, … on port 7860 |
+| **Agent** | LangChain 1.x `create_agent` | Compiled LangGraph; Gemini tool-calling loop |
+| **LLM** | Google Gemini `gemini-2.5-flash` | Free tier; `temperature=0` |
+| **RAG embeddings** | `all-MiniLM-L6-v2` (local) | 384-dim, runs in-process, no API cost |
+| **Vector store** | Chroma (persistent, local) | Rebuilt from the committed corpus on boot |
+| **MCP server** | FastMCP (stdio subprocess) | Football tools, loaded via `langchain-mcp-adapters` |
+| **Live data** | football-data.org + API-Football | Falls back to bundled sample data without keys |
+| **Deploy** | HF Docker Space (backend) + static host (frontend) | Backend image built from the repo `Dockerfile` |
 
-## Screenshots
+## Architecture
 
-> Phase 1 frontend (Vue 3 + Vite) running on mock data.
+```mermaid
+flowchart LR
+    UI["Vue 3 UI"] -- "POST /agent/chat (SSE)" --> API["FastAPI backend"]
+    API --> AGENT["LangChain agent<br/>Gemini 2.5 Flash tool-calling"]
+    AGENT -- "history / rules" --> RAG["RAG tool<br/>Chroma + MiniLM"]
+    AGENT -- "self / meta" --> SKILL["Skill tool<br/>architecture docs"]
+    AGENT -- "live data" --> ADAPTER["langchain-mcp-adapters"]
+    ADAPTER --> MCP["FastMCP server<br/>get_standings · get_fixtures<br/>get_live_scores · get_top_scorers"]
+    RAG --> CORPUS["backend/data/corpus"]
+    MCP --> EXT["football-data.org<br/>API-Football"]
+    AGENT -- "streamed tokens" --> UI
+```
 
-| Ask AI (chat) | Standings |
-| --- | --- |
-| ![Ask AI chat view answering a question with a LIVE source badge](docs/screenshot-chat.png) | ![Group standings view with 12 groups of four](docs/screenshot-standings.png) |
+The agent's LLM picks the right tool(s) per question and may call **several**
+(e.g. compare a team's current form to a past campaign → live tool **and** RAG),
+then writes a grounded answer.
 
-**Animated intro splash**
+## Components
 
-![GoldenGoal animated intro splash over a soccer pitch](docs/screenshot-splash.png)
+### Agent — `backend/app/agent.py`
+The orchestrator. Built with LangChain's `create_agent`, it runs a tool-calling
+loop: the LLM reads the question, decides which tool(s) to call, reads their
+output, and writes a grounded answer. It is assembled with three kinds of tools
+(RAG, skill, MCP football) and a `COACH_SYSTEM_PROMPT` that sets the persona,
+tool-routing rules, and guardrails — including a rule to **never store or echo
+personal details** (emails, phone numbers, etc.). An in-memory checkpointer keeps
+short-term conversation state per `thread_id`.
+
+### RAG — `backend/rag/`
+The knowledge base for historical/reference facts. A curated corpus
+(`backend/data/corpus/*.txt`, ~14 Wikipedia pages) is chunked
+(`RecursiveCharacterTextSplitter`, 500/50), embedded locally with MiniLM, and
+stored in Chroma (~1,565 chunks). At query time the agent's `search_worldcup_knowledge`
+tool retrieves the top matches and the LLM answers **only** from them.
+
+### MCP — `backend/mcp_server/football_tools.py`
+A standalone **FastMCP** server exposing live football tools: `get_standings`,
+`get_fixtures`, `get_live_scores`, `get_top_scorers`, `get_todays_matches`,
+`get_results`. The agent launches it as a stdio subprocess via
+`langchain-mcp-adapters`, so the MCP tools appear to the agent as ordinary
+LangChain tools. It calls football-data.org and API-Football, and degrades to
+bundled sample data when no API keys are set.
+
+### Skill — `backend/skills/goldengoal-architecture/`
+Curated, verbatim docs about how **this app** is built. Surfaced via a
+`read_skill_file` tool: for "how are you built?" questions the agent reads
+`SKILL.md` to see the index, then reads the matching `reference/*.md` file and
+answers from it — no hard-coded routing.
+
+### Services — `backend/services/football.py`
+Returns **structured JSON** (not LLM text) for the frontend's Standings and
+Schedule views, behind the `/standings` and `/schedule` endpoints.
+
+## FastAPI endpoints (`backend/app/main.py`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/agent/chat` | Streamed agent answer (SSE: token / tool / done / error). Used by the chat UI |
+| `POST` | `/ask` | Non-streaming RAG answer (grounded answer + retrieved sources) |
+| `POST` | `/ingest` | Add a single `.txt` file to the corpus index |
+| `POST` | `/ingest/corpus` | Rebuild the index from every `.txt` in `data/corpus` |
+| `GET` | `/standings` | Structured group standings for the FE view |
+| `GET` | `/schedule` | Structured fixtures/schedule for the FE view |
+| `GET` | `/health` | Service status + indexed chunk count |
+| `GET` | `/debug/chunks` | Inspect stored chunks/embeddings |
+| `DELETE` | `/reset` | Clear the vector store |
+
+On startup the backend rebuilds the Chroma index from the committed corpus if it
+is empty, so deploys are deterministic.
+
+## Run the backend
+
+Dependencies are managed with [uv](https://docs.astral.sh/uv/).
+
+```bash
+cd backend
+uv sync                              # create .venv from the lockfile
+
+# (one-off) fetch the Wikipedia corpus, then build the index
+uv run python -m scripts.build_corpus
+uv run python -m rag.ingest
+
+# serve the API
+uv run uvicorn app.main:app --reload --port 8000
+```
+
+Secrets live in a repo-root `.env` (copy `.env.example`):
+
+- `GOOGLE_API_KEY` — **required** for `/ask` and `/agent/chat` (Gemini).
+- `FOOTBALL_DATA_KEY`, `API_FOOTBALL_KEY` — **optional**; without them the live
+  football tools return bundled sample data.
+
+## Run the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev      # http://localhost:5173
+```
+
+The UI talks to the backend at `VITE_API_BASE` (defaults to
+`http://localhost:8000`). Set it to your backend URL for a deployed build:
+
+```bash
+VITE_API_BASE="https://<your-backend-host>" npm run build
+```
 
 ## Monorepo layout
 
 ```
 worldcup-agent/
-  backend/      # FastAPI + RAG + the agent layer        (Phases 2–6)
-  mcp_server/   # FastMCP football tools                 (Phase 4)
-  frontend/     # Vue 3 + Vite chat UI                   (Phase 1 — built)
-  data/         # committed corpus + gitignored chroma_db
-  docs/
+  backend/
+    app/          # FastAPI surface + agent (main.py, agent.py)
+    rag/          # embeddings, Chroma store, ingestion, retrieval
+    services/     # structured football data for the FE views
+    mcp_server/   # FastMCP football tools (stdio subprocess)
+    skills/       # goldengoal-architecture skill (self-knowledge docs)
+    scripts/      # build_corpus.py (fetch Wikipedia -> data/corpus)
+    data/         # committed corpus + gitignored chroma_db
+  frontend/       # Vue 3 + Vite chat UI
+  docs/           # supporting docs
+  Dockerfile      # backend image for the Hugging Face Space
 ```
 
-## Build phases
+## Deployment
 
-| Phase | Status | What |
-| --- | --- | --- |
-| 0. Repo setup | ✅ done | Monorepo skeleton + `.gitignore` + `.env.example` |
-| 1. Frontend + dummy data | ✅ done | Vue chat UI against a **mock** `/ask` + source badge |
-| 2. Backend contract | ⬜ next | FastAPI `/ask` + `/health` returning stubbed responses |
-| 3. RAG (reuse existing) | ⬜ | Copy `rag-poc-langchain` RAG → `backend/app/rag/`, Gemini + MiniLM |
-| 4. MCP tools | ⬜ | `mcp_server/football_tools.py` (FastMCP) |
-| 5. Agent layer | ⬜ | `langchain-mcp-adapters` + RAG-as-a-tool routing |
-| 6. Integrate | ⬜ | Replace mock data with the real agent |
-| 7. Harden + ship | ⬜ | Rate limit, caching, keep-warm, deploy |
-
-## Target architecture
-
-Where this is heading once the backend, RAG, MCP, and agent layers land:
-
-```mermaid
-flowchart LR
-    UI["Vue 3 UI<br/>(this repo, built)"] -- "POST /ask" --> API["FastAPI backend"]
-    API --> AGENT["LangChain agent<br/>Gemini 2.5 Flash tool-calling"]
-    AGENT -- "historical / rules" --> RAG["RAG tool<br/>Chroma + MiniLM"]
-    AGENT -- "live scores / fixtures" --> ADAPTER["langchain-mcp-adapters<br/>(MCP connector)"]
-    ADAPTER --> MCP["FastMCP server<br/>get_fixtures · get_standings<br/>get_top_scorers · get_results_on_date"]
-    RAG --> CORPUS["data/corpus"]
-    MCP --> EXT["football-data.org<br/>TheSportsDB"]
-    AGENT -- "AskResponse" --> UI
-```
-
-**How the swap works:** the UI depends only on the `AskResponse` type
-([`frontend/src/api/types.ts`](frontend/src/api/types.ts)). Today `askMock()` returns that shape;
-in Phase 6 it becomes a real `fetch()` to the FastAPI `/ask` endpoint. Behind `/ask`, a **LangChain
-agent** (Gemini tool-calling) routes each question to **RAG** (history, rules, formats), to a
-**live MCP tool** reached through the **`langchain-mcp-adapters` connector** into the **FastMCP**
-server (today's scores, standings, fixtures), or **both combined** — and the existing source badge
-(`RAG` / `LIVE` / `AGENT`) already reflects that routing.
-
-## Run the frontend (Phase 1)
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Then open http://localhost:5173. The chat returns **mock** answers and shows whether each
-answer would come from RAG, a live MCP tool, or the combined agent.
+- **Backend:** the repo `Dockerfile` builds the FastAPI app and serves it on port
+  `7860` (the Hugging Face Space front-matter at the top of this file configures
+  the Space). The Chroma index is rebuilt from the committed corpus on first boot.
+- **Frontend:** a static Vite build (`npm run build`) hosted on any static host,
+  pointed at the backend via `VITE_API_BASE`.

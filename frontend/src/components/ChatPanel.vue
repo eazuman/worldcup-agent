@@ -2,7 +2,7 @@
 import { nextTick, ref } from 'vue'
 import MessageBubble from './MessageBubble.vue'
 import { streamAgent } from '../api/agent'
-import { SAMPLE_QUESTIONS } from '../api/mock'
+import { SAMPLE_QUESTIONS, SAMPLE_WORKFLOW_NOTES } from '../api/mock'
 import type { ChatMessage } from '../api/types'
 
 const messages = ref<ChatMessage[]>([
@@ -11,7 +11,7 @@ const messages = ref<ChatMessage[]>([
     role: 'assistant',
     text:
       "Hey! I'm your World Cup soccer coach. Ask me about the 2026 tournament — " +
-      "format, hosts, stadiums, team history.\n\n" +
+      "format, hosts, stadiums, team history — or about how this agent itself works.\n\n" +
       '📚 History & facts come from my knowledge base (RAG). ' +
       '🛰️ Live scores, standings & today’s schedule come from the MCP football server. ' +
       '🧩 Ask how I’m built and I’ll explain my own setup (architecture skill).',
@@ -37,6 +37,13 @@ async function send(text?: string) {
   busy.value = true
 
   messages.value.push({ id: nextId++, role: 'user', text: question })
+
+  // For the predefined sample questions, show a hint of which agent workflow
+  // (RAG / MCP / skill) the question is designed to demonstrate.
+  const workflowNote = SAMPLE_WORKFLOW_NOTES[question]
+  if (workflowNote) {
+    messages.value.push({ id: nextId++, role: 'assistant', text: workflowNote, note: true })
+  }
 
   // The backend agent decides which tool(s) to call — RAG for historical /
   // reference facts, MCP for live schedule / standings. The UI just streams
@@ -104,6 +111,7 @@ async function send(text?: string) {
         :source="m.source"
         :tool="m.tool"
         :pending="m.pending"
+        :note="m.note"
       />
     </div>
 
@@ -123,7 +131,7 @@ async function send(text?: string) {
       <input
         v-model="input"
         :disabled="busy"
-        placeholder="Ask about World Cup 2026…"
+        placeholder="Hey! How can I help you today?"
         autocomplete="off"
       />
       <button type="submit" :disabled="busy || !input.trim()">Send</button>
@@ -145,23 +153,28 @@ async function send(text?: string) {
   min-height: 0;
 }
 .samples {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 0.4rem;
-  padding: 0.5rem 1rem;
-  border-top: 1px solid #1e293b;
+  padding: 0.6rem 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
 }
 .chip {
-  background: #0f172a;
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.04);
   color: #cbd5e1;
-  border: 1px solid #334155;
-  border-radius: 999px;
-  padding: 0.3rem 0.7rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  padding: 0.45rem 0.8rem;
   font-size: 0.74rem;
   cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
 }
 .chip:hover:not(:disabled) {
-  background: #1e293b;
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(148, 163, 184, 0.35);
+  transform: translateY(-1px);
 }
 .chip:disabled {
   opacity: 0.5;
@@ -171,29 +184,36 @@ async function send(text?: string) {
   display: flex;
   gap: 0.5rem;
   padding: 0.75rem 1rem 1rem;
-  border-top: 1px solid #1e293b;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
 }
 .composer input {
   flex: 1;
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
   color: #e2e8f0;
-  border-radius: 10px;
-  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  padding: 0.72rem 0.95rem;
   font-size: 0.95rem;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 .composer input:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 .composer button {
-  background: #2563eb;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: #fff;
   border: none;
-  border-radius: 10px;
-  padding: 0 1.2rem;
+  border-radius: 12px;
+  padding: 0 1.3rem;
   font-weight: 600;
   cursor: pointer;
+  transition: filter 0.18s ease, transform 0.18s ease;
+}
+.composer button:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
 }
 .composer button:disabled {
   opacity: 0.5;

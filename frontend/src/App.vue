@@ -3,10 +3,11 @@ import { onMounted, ref } from 'vue'
 import ChatPanel from './components/ChatPanel.vue'
 import StandingsView from './components/StandingsView.vue'
 import ScheduleView from './components/ScheduleView.vue'
+import PredictView from './components/PredictView.vue'
 import IntroSplash from './components/IntroSplash.vue'
 import { fetchDataMode } from './api/football'
 
-type Tab = 'chat' | 'standings' | 'schedule'
+type Tab = 'chat' | 'standings' | 'schedule' | 'predict'
 
 const tab = ref<Tab>('chat')
 const showIntro = ref(true)
@@ -16,6 +17,7 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
   { id: 'chat', label: 'Ask AI', icon: '💬' },
   { id: 'schedule', label: 'Schedule & Scores', icon: '🗓️' },
   { id: 'standings', label: 'Standings', icon: '📊' },
+  { id: 'predict', label: 'Predict', icon: '🔮' },
 ]
 
 onMounted(async () => {
@@ -39,29 +41,57 @@ onMounted(async () => {
     <header class="header">
       <div class="brand">
         <span class="logo" aria-hidden="true">
-          <svg viewBox="0 0 64 64" width="40" height="40" role="img" aria-label="Soccer ball">
+          <svg viewBox="0 0 64 64" width="46" height="46" role="img" aria-label="GoldenGoal logo">
             <defs>
-              <radialGradient id="ggBall" cx="38%" cy="32%" r="75%">
-                <stop offset="0%" stop-color="#fff7d6" />
-                <stop offset="45%" stop-color="#fcd34d" />
+              <linearGradient id="ggGold" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#fde68a" />
+                <stop offset="50%" stop-color="#f59e0b" />
                 <stop offset="100%" stop-color="#b45309" />
+              </linearGradient>
+              <linearGradient id="ggDark" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#1e293b" />
+                <stop offset="100%" stop-color="#0b1220" />
+              </linearGradient>
+              <radialGradient id="ggBall" cx="38%" cy="30%" r="75%">
+                <stop offset="0%" stop-color="#ffffff" />
+                <stop offset="60%" stop-color="#e2e8f0" />
+                <stop offset="100%" stop-color="#94a3b8" />
               </radialGradient>
             </defs>
-            <circle cx="32" cy="32" r="29" fill="url(#ggBall)" stroke="#78350f" stroke-width="2" />
-            <!-- classic soccer-ball pattern: centre pentagon + seams to the edge -->
-            <polygon points="32,23 40.6,29.2 37.3,39.3 26.7,39.3 23.4,29.2" fill="#1f2937" />
-            <g stroke="#1f2937" stroke-width="2.2" fill="none" stroke-linecap="round">
-              <line x1="32" y1="23" x2="32" y2="7" />
-              <line x1="40.6" y1="29.2" x2="56" y2="24" />
-              <line x1="37.3" y1="39.3" x2="46" y2="53" />
-              <line x1="26.7" y1="39.3" x2="18" y2="53" />
-              <line x1="23.4" y1="29.2" x2="8" y2="24" />
+            <!-- modern hexagon badge -->
+            <path
+              d="M32 3 L55 16.5 V43.5 L32 57 L9 43.5 V16.5 Z"
+              fill="url(#ggDark)"
+              stroke="url(#ggGold)"
+              stroke-width="2.5"
+              stroke-linejoin="round"
+            />
+            <!-- dynamic golden motion swoosh -->
+            <path
+              d="M13 41 Q31 51 51 28"
+              fill="none"
+              stroke="url(#ggGold)"
+              stroke-width="3"
+              stroke-linecap="round"
+              opacity="0.9"
+            />
+            <!-- stylized soccer ball -->
+            <g class="logo-ball">
+              <circle cx="32" cy="29" r="12.5" fill="url(#ggBall)" />
+              <polygon points="32,24 36.76,27.45 34.94,33.05 29.06,33.05 27.25,27.45" fill="#1f2937" />
+              <g stroke="#1f2937" stroke-width="1.6" fill="none" stroke-linecap="round">
+                <line x1="32" y1="24" x2="32" y2="16.5" />
+                <line x1="36.76" y1="27.45" x2="43.89" y2="25.14" />
+                <line x1="34.94" y1="33.05" x2="39.35" y2="39.11" />
+                <line x1="29.06" y1="33.05" x2="24.65" y2="39.11" />
+                <line x1="27.25" y1="27.45" x2="20.11" y2="25.14" />
+              </g>
             </g>
           </svg>
         </span>
         <div class="brand-text">
           <h1>G<span class="o-ball" aria-hidden="true">⚽</span>lden<span class="gold">G<span class="o-ball" aria-hidden="true">⚽</span>al</span></h1>
-          <p>World Cup 2026 · RAG + MCP + Agent</p>
+          <p>World Cup 2026 · RAG + MCP + SKILLS + Agent</p>
         </div>
       </div>
       <span class="phase" :class="dataMode === 'live' ? 'phase-live' : 'phase-mock'">
@@ -104,6 +134,7 @@ onMounted(async () => {
       <KeepAlive>
         <ChatPanel v-if="tab === 'chat'" />
         <StandingsView v-else-if="tab === 'standings'" />
+        <PredictView v-else-if="tab === 'predict'" />
         <ScheduleView v-else />
       </KeepAlive>
     </main>
@@ -177,7 +208,12 @@ onMounted(async () => {
 }
 .logo {
   display: inline-flex;
-  filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.45));
+  filter: drop-shadow(0 4px 14px rgba(245, 158, 11, 0.5));
+}
+.logo-ball {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: brandBallSpin 14s linear infinite;
 }
 .brand-text h1 {
   margin: 0;
@@ -239,14 +275,18 @@ onMounted(async () => {
 .hero {
   position: relative;
   margin: 0.4rem 1.2rem 0.2rem;
-  padding: 1.1rem 1.3rem;
-  border-radius: 18px;
+  padding: 1.2rem 1.4rem;
+  border-radius: 20px;
   overflow: hidden;
   background:
-    linear-gradient(120deg, rgba(15, 23, 42, 0.2), rgba(15, 23, 42, 0.55)),
-    radial-gradient(140% 120% at 0% 0%, #1f8a3b 0%, #157a32 38%, #0c5a23 100%);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 14px 30px rgba(12, 90, 35, 0.28);
+    radial-gradient(120% 140% at 85% -20%, rgba(52, 211, 153, 0.28), transparent 55%),
+    radial-gradient(100% 120% at 0% 120%, rgba(5, 46, 22, 0.6), transparent 60%),
+    linear-gradient(135deg, #0d3d22 0%, #0a5a30 45%, #073d20 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 60px rgba(0, 0, 0, 0.25),
+    0 18px 40px rgba(4, 47, 22, 0.45);
 }
 .hero-stripes {
   position: absolute;
@@ -254,9 +294,11 @@ onMounted(async () => {
   pointer-events: none;
   background: repeating-linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.05) 0 10%,
-    rgba(0, 0, 0, 0.05) 10% 20%
+    rgba(255, 255, 255, 0.022) 0 9%,
+    rgba(0, 0, 0, 0.03) 9% 18%
   );
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent);
 }
 .hero-content {
   position: relative;
@@ -387,11 +429,13 @@ onMounted(async () => {
 .tabs {
   display: flex;
   gap: 0.35rem;
-  padding: 0.4rem;
+  padding: 0.35rem;
   margin: 0.4rem 1.2rem 0.6rem;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 14px;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 .tab {
   flex: 1;
@@ -399,9 +443,9 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  padding: 0.55rem 0.6rem;
-  border: none;
-  border-radius: 10px;
+  padding: 0.6rem 0.6rem;
+  border: 1px solid transparent;
+  border-radius: 11px;
   background: transparent;
   color: #94a3b8;
   font-family: var(--font-display);
@@ -409,15 +453,23 @@ onMounted(async () => {
   font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: color 0.18s ease, background 0.18s ease, transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
 .tab:hover {
   color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.05);
 }
 .tab.active {
   color: #fff;
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+  background: linear-gradient(135deg, #3b82f6, #7c3aed);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 8px 22px rgba(37, 99, 235, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.tab.active:hover {
+  background: linear-gradient(135deg, #3b82f6, #7c3aed);
 }
 .tab-icon {
   font-size: 1rem;
@@ -426,10 +478,18 @@ onMounted(async () => {
   flex: 1;
   min-height: 0;
   margin: 0 0.6rem 0.6rem;
-  background: rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 18px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.045),
+    rgba(15, 23, 42, 0.55)
+  );
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 20px;
   overflow: hidden;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 20px 50px rgba(0, 0, 0, 0.35);
 }
 </style>

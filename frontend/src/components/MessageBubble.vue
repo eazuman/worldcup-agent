@@ -7,6 +7,7 @@ const props = defineProps<{
   source?: AnswerSource
   tool?: string
   pending?: boolean
+  note?: boolean
 }>()
 
 const BADGE: Record<AnswerSource, { label: string; cls: string }> = {
@@ -18,7 +19,10 @@ const BADGE: Record<AnswerSource, { label: string; cls: string }> = {
 </script>
 
 <template>
-  <div class="row" :class="props.role">
+  <div v-if="props.note" class="note-row">
+    <span class="note">{{ props.text }}</span>
+  </div>
+  <div v-else class="row" :class="props.role">
     <div class="bubble" :class="props.role">
       <div v-if="props.role === 'assistant' && props.source" class="meta">
         <span class="badge" :class="BADGE[props.source].cls">{{ BADGE[props.source].label }}</span>
@@ -35,24 +39,43 @@ const BADGE: Record<AnswerSource, { label: string; cls: string }> = {
   display: flex;
   margin: 0.5rem 0;
 }
+.note-row {
+  display: flex;
+  justify-content: center;
+  margin: 0.5rem 0 0.1rem;
+}
+.note {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  background: #0f172a;
+  border: 1px dashed #334155;
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  text-align: center;
+  max-width: 90%;
+}
 .row.user {
   justify-content: flex-end;
 }
 .bubble {
   max-width: 78%;
-  padding: 0.7rem 0.9rem;
-  border-radius: 14px;
-  line-height: 1.45;
+  padding: 0.75rem 0.95rem;
+  border-radius: 16px;
+  line-height: 1.5;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
 }
 .bubble.user {
-  background: #2563eb;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: #fff;
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: 5px;
 }
 .bubble.assistant {
-  background: #1e293b;
+  background: rgba(30, 41, 59, 0.85);
   color: #e2e8f0;
-  border-bottom-left-radius: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-bottom-left-radius: 5px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 .meta {
   display: flex;

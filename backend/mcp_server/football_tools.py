@@ -27,7 +27,7 @@ from mcp.server.fastmcp import FastMCP
 
 # Load FOOTBALL_DATA_KEY from the repo-root .env and the local mcp_server/.env.
 _HERE = Path(__file__).resolve().parent
-load_dotenv(_HERE.parent / ".env")
+load_dotenv(_HERE.parents[1] / ".env")
 load_dotenv(_HERE / ".env")
 
 # football-data.org REST API. The free tier covers the FIFA World Cup

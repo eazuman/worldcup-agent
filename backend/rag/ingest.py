@@ -6,13 +6,13 @@ from pathlib import Path
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from app.rag.store import CorpusVectorStore
+from rag.store import CorpusVectorStore
 
 # Chunking parameters carried over from the rag-poc-langchain POC.
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
-BASE_DIR = Path(__file__).resolve().parents[3]
+BASE_DIR = Path(__file__).resolve().parents[1]
 CORPUS_DIR = BASE_DIR / "data" / "corpus"
 
 
@@ -86,7 +86,7 @@ def ingest_corpus(store: CorpusVectorStore, corpus_dir: Path = CORPUS_DIR) -> di
 
 
 if __name__ == "__main__":
-    from app.rag.embeddings import get_embeddings
+    from rag.embeddings import get_embeddings
 
     chroma_dir = BASE_DIR / "data" / "chroma_db"
     chroma_dir.mkdir(parents=True, exist_ok=True)

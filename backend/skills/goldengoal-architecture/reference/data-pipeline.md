@@ -2,7 +2,7 @@
 
 How text knowledge gets into the vector store.
 
-## Pluggable sources (`backend/app/rag/sources.py`)
+## Pluggable sources (`backend/rag/sources.py`)
 
 A single seam decides *where data comes from*. Every source returns LangChain
 `Document` objects, so the rest of the pipeline never changes.
@@ -24,7 +24,7 @@ A single seam decides *where data comes from*. Every source returns LangChain
 
 Run: `uv run python -m scripts.build_corpus`
 
-## Ingesting into Chroma (`backend/app/rag/ingest.py`)
+## Ingesting into Chroma (`backend/rag/ingest.py`)
 
 - `RecursiveCharacterTextSplitter` with `chunk_size=500`, `chunk_overlap=50`.
 - `make_doc_id` derives a stable id from a sha256 prefix of the text.
@@ -32,7 +32,7 @@ Run: `uv run python -m scripts.build_corpus`
 - `ingest_corpus(store, corpus_dir)` resets the collection, then adds every
   `.txt` in `data/corpus/` (currently ~1,565 chunks across 14 files).
 
-Run: `uv run python -m app.rag.ingest` (or `POST /ingest/corpus`).
+Run: `uv run python -m rag.ingest` (or `POST /ingest/corpus`).
 
 ## Adding a second knowledge set (e.g. "about the app")
 

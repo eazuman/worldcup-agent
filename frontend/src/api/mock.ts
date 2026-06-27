@@ -65,5 +65,18 @@ export const SAMPLE_QUESTIONS = [
   'Which country has won the most World Cups?',
   'How is the GoldenGoal agent set up — walk me through how it works?',
   'What World Cup matches are on the schedule today?',
-  'How do the RAG knowledge base and MCP football tools connect to the agent?',
+  'How are RAG and MCP wired into the agent?',
 ]
+
+// Which agent workflow each sample question is designed to showcase. Shown as a
+// hint just before the agent answers so the routing is visible in the demo.
+export const SAMPLE_WORKFLOW_NOTES: Record<string, string> = {
+  'Which country has won the most World Cups?':
+    '📚 This response uses the RAG workflow — answered from the World Cup knowledge base.',
+  'How is the GoldenGoal agent set up — walk me through how it works?':
+    '🧩 This response uses the skill workflow — the agent reads its own architecture docs.',
+  'What World Cup matches are on the schedule today?':
+    '🛰️ This response uses the MCP workflow — live data from the football tools.',
+  'How are RAG and MCP wired into the agent?':
+    '🧩 This response uses the skill workflow — the agent explains how it is wired.',
+}

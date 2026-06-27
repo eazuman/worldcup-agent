@@ -4,10 +4,9 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
-from app.rag.store import CorpusVectorStore
+from rag.store import CorpusVectorStore
 
-# Adapted from the POC's prompt, scoped to the World Cup corpus. Treats the
-# retrieved corpus text as the only source of truth and refuses to invent facts
+# Treats the retrieved corpus text as the only source of truth and refuses to invent facts
 # (prompt-injection / hallucination guardrail).
 SYSTEM_PROMPT = (
     "You are GoldenGoal, a helpful assistant answering questions about the FIFA World Cup. "

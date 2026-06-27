@@ -12,7 +12,7 @@ venv/
 !.env.example
 
 # --- RAG generated index (rebuilt from data/corpus on deploy) ---
-data/chroma_db/
+backend/data/chroma_db/
 
 # --- Node (frontend) ---
 node_modules/

@@ -10,10 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.rag.embeddings import get_embeddings
-from app.rag.ingest import index_text, ingest_corpus
-from app.rag.service import RAGService
-from app.rag.store import CorpusVectorStore
+from rag.embeddings import get_embeddings
+from rag.ingest import index_text, ingest_corpus
+from rag.service import RAGService
+from rag.store import CorpusVectorStore
 
 load_dotenv()
 
@@ -21,7 +21,7 @@ TOP_K = 3
 LLM_MODEL = "gemini-2.5-flash"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-CHROMA_DIR = BASE_DIR.parent / "data" / "chroma_db"
+CHROMA_DIR = BASE_DIR / "data" / "chroma_db"
 CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Embeddings + store need no API key, so they initialise eagerly. The Gemini LLM
@@ -222,7 +222,7 @@ async def standings() -> dict:
     Returns {source: "live"|"sample", groups: [...]}. On any API error it
     degrades to sample so the frontend can fall back to its built-in data.
     """
-    from app.football import get_standings_data
+    from services.football import get_standings_data
 
     try:
         return get_standings_data()
@@ -237,12 +237,42 @@ async def schedule() -> dict:
     Returns {source: "live"|"sample", fixtures: [...]}. On any API error it
     degrades to sample so the frontend can fall back to its built-in data.
     """
-    from app.football import get_schedule_data
+    from services.football import get_schedule_data
 
     try:
         return get_schedule_data()
     except Exception as exc:  # noqa: BLE001 - degrade to sample on any error
         return {"source": "sample", "fixtures": [], "error": str(exc)[:160]}
+
+
+@app.get("/predict/champion")
+async def predict_champion() -> dict:
+    """The agent's predicted World Cup champion + a top-5 leaderboard.
+
+    Uses a transparent heuristic (titles + current goals + golden-boot striker).
+    Degrades to a baked-in sample when no live football data is available.
+    """
+    from services.prediction import predict_champion as _predict
+
+    try:
+        return _predict()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)[:160])
+
+
+class PredictPlayRequest(BaseModel):
+    guess: str = Field(min_length=1, max_length=60)
+
+
+@app.post("/predict/play")
+async def predict_play(payload: PredictPlayRequest) -> dict:
+    """Compare the user's guess to the agent's pick and report win/lose."""
+    from services.prediction import play
+
+    try:
+        return play(payload.guess)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)[:160])
 
 
 @app.get("/debug/chunks")

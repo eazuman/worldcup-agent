@@ -5,6 +5,24 @@ const API_BASE =
   ((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_BASE) ||
   'http://localhost:8000'
 
+// Stable per-tab conversation id. The backend keeps each visitor's agent memory
+// separate via the checkpointer (keyed by thread_id), so we generate a UUID once
+// per browser tab and reuse it for every turn.
+function getThreadId(): string {
+  const KEY = 'gg_thread_id'
+  const fallback = () => `t-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  try {
+    const existing = sessionStorage.getItem(KEY)
+    if (existing) return existing
+    const id = globalThis.crypto?.randomUUID?.() ?? fallback()
+    sessionStorage.setItem(KEY, id)
+    return id
+  } catch {
+    // sessionStorage unavailable (e.g. private mode) — use a volatile id.
+    return fallback()
+  }
+}
+
 export interface AgentHandlers {
   onToken: (text: string) => void
   onTool?: (name: string, phase: 'start' | 'end') => void
@@ -15,7 +33,7 @@ export interface AgentHandlers {
 export async function streamAgent(
   question: string,
   handlers: AgentHandlers,
-  threadId = 'default',
+  threadId = getThreadId(),
 ): Promise<void> {
   let res: Response
   try {

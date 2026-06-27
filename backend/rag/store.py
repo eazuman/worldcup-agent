@@ -8,12 +8,12 @@ from langchain_core.embeddings import Embeddings
 
 
 class CorpusVectorStore:
-    """Persistent Chroma store (via LangChain) for the World Cup RAG corpus.
+    """Persistent Chroma vector store (via LangChain) for the World Cup RAG corpus.
 
-    Adapted from the POC's ``SingleDocVectorStore``. The POC kept exactly one
-    active document and reset on every ingest; here the store holds a whole
-    **corpus** of committed ``.txt`` files, so callers add many documents and
-    call :meth:`reset` only when rebuilding the index from scratch.
+    This holds the **whole corpus** — every committed ``data/corpus/*.txt`` file is
+    chunked and stored together (currently ~1,565 chunks across 14 files). Callers
+    add many documents over the corpus and only call :meth:`reset` when rebuilding
+    the index from scratch.
     """
 
     def __init__(

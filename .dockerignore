@@ -25,7 +25,7 @@ frontend/dist/
 frontend/.vite/
 
 # Generated RAG index (rebuilt from data/corpus on first boot)
-data/chroma_db/
+backend/data/chroma_db/
 
 # Logs
 *.log

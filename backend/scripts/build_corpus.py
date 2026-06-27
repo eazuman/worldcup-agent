@@ -1,16 +1,12 @@
-"""Build the World Cup corpus from a pluggable source and write it to ``data/corpus``.
+"""Build the World Cup corpus and write it to ``data/corpus``.
 
-Run from the ``backend`` directory:
+Manual, on-demand job — nothing triggers it automatically. Run from ``backend/``:
 
-    python -m scripts.build_corpus
+    uv run python -m scripts.build_corpus
 
-This fetches a curated set of Wikipedia pages (the default ``WikipediaSource``) and
-writes one ``.txt`` file per page into ``data/corpus/``. Those files are committed to
-git so the vector index can be rebuilt deterministically on any machine with
-``python -m app.rag.ingest``.
-
-To change *where* the data comes from later, swap ``build_source()`` for an
-``S3Source`` / ``FilesSource`` — nothing else in the pipeline changes.
+Re-run to refresh the pages or change ``WIKI_QUERIES`` (each run overwrites the
+``.txt`` files); then commit them. Swap ``build_source()`` for an ``S3Source`` /
+``FilesSource`` to change where the data comes from.
 """
 
 from __future__ import annotations
@@ -18,10 +14,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from app.rag.sources import WikipediaSource, load_documents
+from rag.sources import WikipediaSource, load_documents
 
-# Repo root is two levels up from backend/scripts/.
-BASE_DIR = Path(__file__).resolve().parents[2]
+# backend/ is one level up from backend/scripts/.
+BASE_DIR = Path(__file__).resolve().parents[1]
 CORPUS_DIR = BASE_DIR / "data" / "corpus"
 
 # Curated, minimal POC set (~14 pages): the 2026 tournament, its format and hosts,
