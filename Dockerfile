@@ -6,22 +6,33 @@
 # is gitignored and rebuilt from data/corpus on first boot (see main.py startup).
 FROM python:3.12-slim
 
+# uv binary (matches the version used locally) for dependency management.
+COPY --from=ghcr.io/astral-sh/uv:0.8.22 /uv /uvx /usr/local/bin/
+
 ENV PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
-    HF_HOME=/home/user/.cache/huggingface
+    HF_HOME=/home/user/.cache/huggingface \
+    UV_NO_CACHE=1
 
 # Hugging Face Spaces runs the container as UID 1000 — create a matching user so
 # the app can read its model cache and write the rebuilt index.
 RUN useradd -m -u 1000 user
 USER user
-ENV PATH=/home/user/.local/bin:$PATH
 WORKDIR /home/user/app
 
-# Install CPU-only PyTorch first (much smaller than the default CUDA wheel),
-# then the rest of the backend dependencies.
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-COPY --chown=user backend/requirements.txt ./backend/requirements.txt
-RUN pip install --no-cache-dir -r backend/requirements.txt
+# Put the project venv on PATH so `python`/`uvicorn` (and the MCP subprocess via
+# sys.executable) all use it.
+ENV VIRTUAL_ENV=/home/user/app/backend/.venv \
+    PATH=/home/user/app/backend/.venv/bin:/home/user/.local/bin:$PATH
+
+# Dependency manifests first for better layer caching.
+COPY --chown=user backend/pyproject.toml backend/uv.lock ./backend/
+
+# Create the venv, install CPU-only PyTorch (much smaller than the default CUDA
+# wheel), then the rest of the backend dependencies from pyproject via uv.
+RUN cd backend \
+    && uv venv \
+    && uv pip install torch --index-url https://download.pytorch.org/whl/cpu \
+    && uv pip install -r pyproject.toml
 
 # Copy the application code (backend, mcp_server, data/corpus, skills).
 COPY --chown=user . .
