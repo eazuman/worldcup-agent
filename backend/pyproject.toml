@@ -24,8 +24,20 @@ dependencies = [
     "langchain-mcp-adapters",
     # Hardening
     "slowapi",
+    # Pinned explicitly so we can force the CPU-only wheel (see tool.uv.sources).
+    "torch",
 ]
 
 [tool.uv]
 # Application project (not a distributable library) — do not try to build app/scripts.
 package = false
+
+# Pull torch from the CPU-only index so Linux builds don't drag in the multi-GB
+# CUDA/NVIDIA packages (the Spaces backend runs on CPU).
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }

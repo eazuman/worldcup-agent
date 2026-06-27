@@ -27,12 +27,9 @@ ENV VIRTUAL_ENV=/home/user/app/backend/.venv \
 # Dependency manifests first for better layer caching.
 COPY --chown=user backend/pyproject.toml backend/uv.lock ./backend/
 
-# Create the venv, install CPU-only PyTorch (much smaller than the default CUDA
-# wheel), then the rest of the backend dependencies from pyproject via uv.
-RUN cd backend \
-    && uv venv \
-    && uv pip install torch --index-url https://download.pytorch.org/whl/cpu \
-    && uv pip install -r pyproject.toml
+# Install the locked dependencies (torch resolves to the CPU-only wheel via the
+# pytorch-cpu index configured in pyproject.toml) into backend/.venv.
+RUN cd backend && uv sync --frozen --no-dev
 
 # Copy the application code (backend, mcp_server, data/corpus, skills).
 COPY --chown=user . .
